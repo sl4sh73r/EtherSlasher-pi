@@ -331,7 +331,7 @@
 <!-- ═══════════════════════════════════════ SIDEBAR ═══════════════════════════════════════ -->
 <div id="sidebar">
   <div class="logo">
-    <img src="/logo.svg" alt="EtherSlasher">
+    <img src="/logo.svg" style="width:180px;padding:16px;display:block;">
   </div>
   <nav>
     <a href="#" class="active" onclick="nav('dashboard',this)">
@@ -846,11 +846,12 @@ socket.on('connect', () => {
 });
 socket.on('disconnect', () => logLine('events-log', 'Socket disconnected', 'err'));
 
-socket.on('ap-update', (data) => {
+function handleApUpdate(data) {
   state.aps = data;
   renderAPs();
   document.getElementById('stat-aps').textContent = data.length;
-});
+}
+socket.on('ap-update', handleApUpdate);
 
 socket.on('client-update', (data) => {
   state.clients = data;
@@ -1269,7 +1270,7 @@ function initActivityChart() {
   });
 }
 
-socket.on('activity_update', (data) => {
+function handleActivityUpdate(data) {
   const overlay = document.getElementById('chart-overlay');
   const badge   = document.getElementById('badge-activity');
   const datasets = data.datasets || [];
@@ -1303,9 +1304,24 @@ socket.on('activity_update', (data) => {
     }
   }
   activityChart.update('none');
-});
+}
+socket.on('activity_update', handleActivityUpdate);
 
 document.addEventListener('DOMContentLoaded', initActivityChart);
+
+// ─── Batch dispatcher ───────────────────────────────────────────────────────
+socket.on('batch', (items) => {
+  for (const { event, data } of items) {
+    if      (event === 'ap-update')        handleApUpdate(data);
+    else if (event === 'scan_aps')         handleApUpdate(data);
+    else if (event === 'activity_update')  handleActivityUpdate(data);
+    else if (event === 'system_stats')     handleSystemStats(data);
+    else if (event === 'log') {
+      const ts  = data.ts ? new Date(data.ts).toTimeString().slice(0,8) : '??:??:??';
+      logLineTyped('events-log', ts, (data.type||'INFO').toUpperCase(), data.message||'');
+    }
+  }
+});
 
 // ═══════════════════════════════════════════════════════
 // CLIENTS
@@ -1505,13 +1521,14 @@ function applyHealthBar(barId, valId, pct, value, warnThresh, critThresh) {
   val.textContent = value;
 }
 
-socket.on('system_stats', (s) => {
+function handleSystemStats(s) {
   applyHealthBar('bar-cpu',  'val-cpu',  s.cpuPercent, s.cpuPercent + '%', 70, 90);
   applyHealthBar('bar-ram',  'val-ram',  s.ramPercent, s.ramPercent + '%', 70, 90);
   applyHealthBar('bar-temp', 'val-temp', Math.round(s.temp), s.temp + '°C', 60, 75);
   const ut = document.getElementById('val-uptime');
   if (ut) ut.textContent = fmtUptime(s.uptime);
-});
+}
+socket.on('system_stats', handleSystemStats);
 
 socket.on('alert', (a) => { if (a.type === 'WARNING') toast(a.message, 'warn'); });
 
