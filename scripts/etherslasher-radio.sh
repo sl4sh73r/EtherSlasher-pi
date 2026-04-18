@@ -1,5 +1,5 @@
 #!/bin/bash
-# PineapplePI Radio Stack Manager — final
+# EtherSlasher Radio Stack Manager — final
 # RTL8812AU (88XXau) wlan1:
 #   AP mode via nl80211/hostapd HANGS this kernel — use airbase-ng instead
 #   airbase-ng runs in monitor mode, creates at0 tap interface for clients
@@ -7,8 +7,8 @@
 IFACE="wlan1"
 DRIVER="88XXau"
 AP_IP="10.0.0.1"
-HOSTAPD_CONF="/opt/pineapple/config/hostapd.conf"
-LOG_DIR="/var/log/pineapple"
+HOSTAPD_CONF="/opt/etherslasher/config/hostapd.conf"
+LOG_DIR="/var/log/etherslasher"
 LOGFILE="${LOG_DIR}/radio.log"
 
 mkdir -p "${LOG_DIR}"

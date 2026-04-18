@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""PineapplePI Recon Engine - nmap + MAC vendor + OS fingerprint + SQLite"""
+"""EtherSlasher Recon Engine - nmap + MAC vendor + OS fingerprint + SQLite"""
 import sqlite3, subprocess, json, re, time, logging, socket
 import urllib.request, urllib.error, urllib.parse
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = '/opt/pineapple/db/pineapple.db'
-LOG_PATH = '/var/log/pineapple/recon.log'
+DB_PATH = '/opt/etherslasher/db/etherslasher.db'
+LOG_PATH = '/var/log/etherslasher/recon.log'
 
 logging.basicConfig(
     filename=LOG_PATH, level=logging.INFO,
@@ -50,7 +50,7 @@ def get_mac_vendor(mac):
         return 'Unknown'
     try:
         url = f'https://api.macvendors.com/{urllib.parse.quote(mac)}'
-        req = urllib.request.Request(url, headers={'User-Agent': 'PineapplePI/1.0'})
+        req = urllib.request.Request(url, headers={'User-Agent': 'EtherSlasher/1.0'})
         with urllib.request.urlopen(req, timeout=3) as r:
             return r.read().decode().strip()
     except Exception:
@@ -118,7 +118,7 @@ def check_nvd_cves(service_name, version):
     try:
         query = urllib.parse.quote(f'{service_name} {version}')
         url = f'https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={query}&resultsPerPage=5'
-        req = urllib.request.Request(url, headers={'User-Agent': 'PineapplePI/1.0'})
+        req = urllib.request.Request(url, headers={'User-Agent': 'EtherSlasher/1.0'})
         with urllib.request.urlopen(req, timeout=5) as r:
             data = json.loads(r.read().decode())
             cves = []
@@ -180,8 +180,8 @@ def save_client(con, data):
     con.commit()
 
 def main():
-    log.info('PineapplePI Recon Engine запущен')
-    Path('/opt/pineapple/db').mkdir(parents=True, exist_ok=True)
+    log.info('EtherSlasher Recon Engine запущен')
+    Path('/opt/etherslasher/db').mkdir(parents=True, exist_ok=True)
     con = init_db()
     known_clients = set()
 

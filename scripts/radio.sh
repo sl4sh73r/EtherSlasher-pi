@@ -1,5 +1,5 @@
 #!/bin/bash
-# PineapplePI Radio Stack Manager v2
+# EtherSlasher Radio Stack Manager v2
 # wlan0 = BCM (phy1) — admin AP (10.42.0.1)
 # wlan1 = RTL8812AU (phy0) — attack interface
 set -e
@@ -71,7 +71,7 @@ start_ap() {
     log "Интерфейс $ATTACK_IFACE переведён в managed (down), hostapd запустит его"
 
     # Write hostapd config
-    cat > /opt/pineapple/config/hostapd.conf << EOF
+    cat > /opt/etherslasher/config/hostapd.conf << EOF
 interface=$ATTACK_IFACE
 driver=nl80211
 ssid=$SSID

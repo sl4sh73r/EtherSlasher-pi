@@ -1,6 +1,6 @@
 #!/bin/bash
-# PineapplePI OPSEC - MAC randomization + hostname rotation
-LOG=/var/log/pineapple/opsec.log
+# EtherSlasher OPSEC - MAC randomization + hostname rotation
+LOG=/var/log/etherslasher/opsec.log
 log() { echo "[$(date +%T)] OPSEC: $*" | tee -a "$LOG"; }
 
 ADJECTIVES=(shadow dark silent ghost rogue phantom stealth cyber zero)

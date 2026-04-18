@@ -10328,5 +10328,20 @@
     "vendor": "AO",
     "model": "Router",
     "template": "generic"
+  },
+  "08:9A:C7": {
+    "vendor": "zte corporation",
+    "model": "Router",
+    "template": "generic"
+  },
+  "24:CF:24": {
+    "vendor": "Beijing Xiaomi Mobile Software Co., Ltd",
+    "model": "Router",
+    "template": "xiaomi"
+  },
+  "0C:CF:89": {
+    "vendor": "SHENZHEN BILIAN ELECTRONIC CO.，LTD",
+    "model": "Router",
+    "template": "generic"
   }
 }

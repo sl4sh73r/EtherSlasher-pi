@@ -12,14 +12,14 @@ const os         = require('os');
 
 // ─── Config ────────────────────────────────────────────────────────────────
 const PORT         = 8080;
-const DB_PATH      = '/opt/pineapple/db/pineapple.db';
-const LOG_DIR      = '/var/log/pineapple';
-const RADIO_SH     = '/opt/pineapple/scripts/pineapple-radio.sh';
+const DB_PATH      = '/opt/etherslasher/db/etherslasher.db';
+const LOG_DIR      = '/var/log/etherslasher';
+const RADIO_SH     = '/opt/etherslasher/scripts/etherslasher-radio.sh';
 const ATTACK_IFACE = 'wlan1';
 const MON_IFACE    = 'wlan1'; // 88XXau uses wlan1 directly in monitor mode
 const ADMIN_NET    = '10.42.0.0/24';   // wlan0 admin network
 const AP_NET       = '10.0.0.0/24';
-const VENDOR_DB    = '/opt/pineapple/data/router-vendors.json';
+const VENDOR_DB    = '/opt/etherslasher/data/router-vendors.json';
 
 // ─── App setup ─────────────────────────────────────────────────────────────
 const app    = express();
@@ -488,7 +488,7 @@ app.post('/api/scan/passive/start', async (req, res) => {
     }
 
     const monIface = state.monIface || MON_IFACE;
-    const csvFile  = '/tmp/pineapple-passive';
+    const csvFile  = '/tmp/etherslasher-passive';
     // Kill any orphan airodump processes before starting fresh
     try { await sh('pkill -SIGKILL -x airodump-ng 2>/dev/null; true'); } catch {}
     try { await sh(`rm -f ${csvFile}*.csv ${csvFile}*.cap`); } catch {}
@@ -528,7 +528,7 @@ app.post('/api/radio/scan', async (req, res) => {
 
     const duration = parseInt(req.body.duration) || 60;
     const monIface = state.monIface || MON_IFACE;
-    const csvFile  = '/tmp/pineapple-scan';
+    const csvFile  = '/tmp/etherslasher-scan';
 
     state.scanActive = true;
     broadcastState();
@@ -926,7 +926,7 @@ app.get('/api/events', (req, res) => {
 
 app.get('/api/events/export', (req, res) => {
     db.all('SELECT * FROM events ORDER BY id DESC LIMIT 10000', [], (err, rows) => {
-        res.setHeader('Content-Disposition', 'attachment; filename=pineapple-events.json');
+        res.setHeader('Content-Disposition', 'attachment; filename=etherslasher-events.json');
         res.json(rows);
     });
 });
@@ -1237,9 +1237,9 @@ setInterval(() => {
 
 // ─── Start ─────────────────────────────────────────────────────────────────
 server.listen(PORT, '0.0.0.0', () => {
-    logEvent('WEB', `PineapplePI Dashboard listening on :${PORT}`);
+    logEvent('WEB', `EtherSlasher Dashboard listening on :${PORT}`);
     // Kill orphan airodump processes from previous crashes
-    exec('pkill -SIGKILL -x airodump-ng 2>/dev/null; rm -f /tmp/pineapple-passive*.csv /tmp/pineapple-passive*.cap', () => {});
+    exec('pkill -SIGKILL -x airodump-ng 2>/dev/null; rm -f /tmp/etherslasher-passive*.csv /tmp/etherslasher-passive*.cap', () => {});
     syncStateWithSystem();
 });
 
