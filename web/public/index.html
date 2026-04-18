@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PineapplePI</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #0a0e1a;
+    --bg2:      #111827;
+    --bg3:      #1a2235;
+    --accent:   #00ff88;
+    --accent2:  #00ccff;
+    --red:      #ff4444;
+    --yellow:   #ffcc00;
+    --orange:   #ff8800;
+    --text:     #c9d1d9;
+    --text2:    #8b949e;
+    --border:   #21262d;
+    --font:     'JetBrains Mono', 'Fira Mono', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; overflow-x: hidden; }
+
+  /* ─── SIDEBAR ─── */
+  #sidebar {
+    position: fixed; top: 0; left: 0; width: 200px; height: 100vh;
+    background: var(--bg2); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; z-index: 100;
+  }
+  #sidebar .logo {
+    padding: 20px 16px 16px;
+    font-size: 15px; font-weight: 700; color: var(--accent);
+    letter-spacing: 1px; border-bottom: 1px solid var(--border);
+  }
+  #sidebar .logo span { color: var(--text2); font-size: 10px; display: block; margin-top: 2px; letter-spacing: 0; }
+  #sidebar nav { flex: 1; padding: 8px 0; }
+  #sidebar nav a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; color: var(--text2); text-decoration: none;
+    font-size: 12px; letter-spacing: 0.5px; transition: all 0.15s;
+    border-left: 3px solid transparent; cursor: pointer;
+  }
+  #sidebar nav a:hover { color: var(--text); background: var(--bg3); }
+  #sidebar nav a.active { color: var(--accent); background: rgba(0,255,136,0.05); border-left-color: var(--accent); }
+  #sidebar nav a .icon { font-size: 14px; width: 18px; text-align: center; }
+  #sidebar .status-bar {
+    padding: 12px 16px; border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text2);
+  }
+  #sidebar .status-bar .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--red); margin-right: 6px; vertical-align: middle;
+  }
+  #sidebar .status-bar .dot.on { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  #sidebar .status-bar .dot.attack { background: var(--orange); box-shadow: 0 0 6px var(--orange); animation: pulse-dot 1s infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ─── MAIN ─── */
+  #main { margin-left: 200px; min-height: 100vh; }
+  .topbar {
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    padding: 12px 24px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar h1 { font-size: 14px; color: var(--text); font-weight: 600; }
+  .topbar .right { display: flex; align-items: center; gap: 16px; font-size: 11px; color: var(--text2); }
+  .topbar .clock { color: var(--accent); font-weight: 700; letter-spacing: 1px; }
+
+  .page { display: none; padding: 24px; }
+  .page.active { display: block; }
+
+  /* ─── CARDS / GRID ─── */
+  .grid { display: grid; gap: 16px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px;
+  }
+  .card.attack-active { border-color: var(--orange); box-shadow: 0 0 16px rgba(255,136,0,.15); }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px;
+  }
+  .card-header .badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    background: rgba(0,255,136,0.1); color: var(--accent); letter-spacing: 0;
+  }
+  .card-header .badge.red { background: rgba(255,68,68,0.1); color: var(--red); }
+  .card-header .badge.yellow { background: rgba(255,204,0,0.1); color: var(--yellow); }
+  .card-header .badge.orange { background: rgba(255,136,0,0.15); color: var(--orange); }
+
+  /* ─── STAT CARDS ─── */
+  .stat { text-align: center; padding: 20px 16px; }
+  .stat .val { font-size: 36px; font-weight: 700; color: var(--accent); line-height: 1; }
+  .stat .val.red { color: var(--red); }
+  .stat .val.yellow { color: var(--yellow); }
+  .stat .val.orange { color: var(--orange); }
+  .stat .lbl { font-size: 10px; color: var(--text2); margin-top: 6px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ─── BUTTONS ─── */
+  .btn {
+    padding: 7px 16px; border: 1px solid var(--border); border-radius: 5px;
+    background: var(--bg3); color: var(--text); font-family: var(--font);
+    font-size: 12px; cursor: pointer; transition: all 0.15s; letter-spacing: 0.5px;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+  .btn.primary:hover { background: #00cc6e; border-color: #00cc6e; }
+  .btn.danger { background: rgba(255,68,68,0.1); color: var(--red); border-color: var(--red); }
+  .btn.danger:hover { background: rgba(255,68,68,0.2); }
+  .btn.attack-btn { background: rgba(255,136,0,0.12); color: var(--orange); border-color: var(--orange); font-weight: 700; }
+  .btn.attack-btn:hover { background: rgba(255,136,0,0.25); }
+  .btn.active-state { background: rgba(0,255,136,0.1); color: var(--accent); border-color: var(--accent); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ─── TABLES ─── */
+  .tbl { width: 100%; border-collapse: collapse; }
+  .tbl th { color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: 1px; font-size: 10px; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  .tbl td { padding: 8px 10px; border-bottom: 1px solid rgba(33,38,45,0.5); font-size: 12px; vertical-align: middle; }
+  .tbl tr:hover td { background: rgba(255,255,255,0.02); }
+  .tbl .mono { font-family: var(--font); font-size: 11px; }
+  .tbl .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; }
+  .tbl .tag.green { background: rgba(0,255,136,0.1); color: var(--accent); }
+  .tbl .tag.orange { background: rgba(255,136,0,0.12); color: var(--orange); }
+
+  /* ─── INPUTS ─── */
+  .input-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .inp {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text); font-family: var(--font); font-size: 12px;
+    padding: 7px 12px; outline: none; transition: border 0.15s;
+  }
+  .inp:focus { border-color: var(--accent); }
+  .inp::placeholder { color: var(--text2); }
+  select.inp option { background: var(--bg2); }
+
+  /* ─── TERMINAL / LOG ─── */
+  .terminal {
+    background: #05080f; border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px; font-size: 11px; line-height: 1.7; font-family: var(--font);
+    height: 320px; overflow-y: auto; color: #6ec87a;
+  }
+  .terminal .ts { color: var(--text2); user-select: none; }
+  .terminal .err { color: var(--red); }
+  .terminal .warn { color: var(--yellow); }
+  .terminal .info { color: var(--accent2); }
+  .terminal .ok { color: var(--accent); }
+  .terminal .attack { color: var(--orange); }
+
+  /* ─── SIGNAL BAR ─── */
+  .sig-bar { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
+  .sig-bar div { width: 4px; background: var(--border); border-radius: 1px; }
+  .sig-bar.s1 div:nth-child(1), .sig-bar.s2 div:nth-child(-n+2),
+  .sig-bar.s3 div:nth-child(-n+3), .sig-bar.s4 div:nth-child(-n+4) { background: var(--accent); }
+  .sig-bar.s1 div:nth-child(1) { height: 4px; }
+  .sig-bar div:nth-child(2) { height: 7px; }
+  .sig-bar div:nth-child(3) { height: 10px; }
+  .sig-bar div:nth-child(4) { height: 14px; }
+
+  /* ─── PROGRESS ─── */
+  .progress-wrap { background: var(--bg3); border-radius: 4px; height: 4px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.4s; width: 0%; }
+  .progress-bar.anim { background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 50%, var(--accent) 100%); background-size: 200%; animation: slide 1.5s linear infinite; }
+  @keyframes slide { 0%{background-position:100%} 100%{background-position:0%} }
+
+  /* ─── SECTION LABELS ─── */
+  .section-title { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px; }
+  .mt16 { margin-top: 16px; }
+  .mt24 { margin-top: 24px; }
+  .sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  /* ─── SCAN STATUS ─── */
+  #scan-status { display: none; }
+  #scan-status.visible { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(0,255,136,0.05); border: 1px solid rgba(0,255,136,0.2); border-radius: 6px; margin-top: 12px; font-size: 12px; color: var(--accent); }
+  #scan-status .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+  /* ─── ATTACK PANEL ─── */
+  #attack-panel {
+    display: none; margin-top: 16px;
+    background: rgba(255,136,0,0.04); border: 1px solid rgba(255,136,0,0.3);
+    border-radius: 8px; padding: 16px;
+  }
+  #attack-panel.active { display: block; }
+  .attack-stages { display: flex; gap: 8px; margin-bottom: 14px; }
+  .attack-stage-dot {
+    width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 11px;
+    font-weight: 700; color: var(--text2); transition: all 0.3s;
+  }
+  .attack-stage-dot.done { border-color: var(--accent); color: var(--accent); background: rgba(0,255,136,0.1); }
+  .attack-stage-dot.active { border-color: var(--orange); color: var(--orange); background: rgba(255,136,0,0.1); animation: pulse-dot 1s infinite; }
+  .attack-info { font-size: 12px; color: var(--text2); line-height: 2; margin-bottom: 12px; }
+  .attack-info span { color: var(--text); }
+  .attack-log { background: #05080f; border: 1px solid var(--border); border-radius: 5px; padding: 10px; height: 120px; overflow-y: auto; font-size: 11px; }
+
+  /* ─── VULN SEVERITY ─── */
+  .sev { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .sev.CRITICAL { background: rgba(255,0,68,0.15); color: #ff0044; }
+  .sev.HIGH     { background: rgba(255,68,68,0.12); color: var(--red); }
+  .sev.MEDIUM   { background: rgba(255,204,0,0.12); color: var(--yellow); }
+  .sev.LOW      { background: rgba(0,255,136,0.1);  color: var(--accent); }
+  .sev.NONE     { background: rgba(139,148,158,0.1); color: var(--text2); }
+
+  /* ─── CRED BADGE ─── */
+  .cred-value { color: var(--yellow); font-weight: 600; }
+
+  /* ─── NETWORK ACTIVITY CHART ─── */
+  .chart-wrap { position:relative; height:240px; }
+  .chart-overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--text2); font-size:12px; pointer-events:none; }
+
+  /* ─── ATTACK STAGES SIDEBAR ─── */
+  .atk-stage { display:flex; gap:10px; padding:10px 14px; border-left:3px solid var(--border); margin-bottom:2px; border-radius:0 6px 6px 0; transition:all .3s; }
+  .atk-stage.active  { border-left-color:var(--orange); background:rgba(255,136,0,.06); }
+  .atk-stage.done    { border-left-color:var(--accent); background:rgba(0,255,136,.04); }
+  .atk-stage.pending { opacity:.45; }
+  .atk-stage-num  { width:22px; height:22px; border-radius:50%; border:1.5px solid currentColor; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; margin-top:1px; }
+  .atk-stage.active  .atk-stage-num { color:var(--orange); animation:pulse-dot 1s infinite; }
+  .atk-stage.done    .atk-stage-num { color:var(--accent); }
+  .atk-stage.pending .atk-stage-num { color:var(--border); }
+  .atk-stage-body { flex:1; min-width:0; }
+  .atk-stage-title { font-size:11px; font-weight:700; margin-bottom:2px; }
+  .atk-stage.active  .atk-stage-title { color:var(--orange); }
+  .atk-stage.done    .atk-stage-title { color:var(--accent); }
+  .atk-stage.pending .atk-stage-title { color:var(--text2); }
+  .atk-stage-detail { font-size:10px; color:var(--text2); line-height:1.5; }
+  .atk-status-pill { display:inline-block; padding:1px 7px; border-radius:10px; font-size:9px; font-weight:700; letter-spacing:.5px; margin-left:6px; }
+  .pill-active  { background:rgba(255,136,0,.2); color:var(--orange); }
+  .pill-done    { background:rgba(0,255,136,.15); color:var(--accent); }
+  .pill-waiting { background:rgba(0,204,255,.12); color:var(--accent2); }
+  .pill-pending { background:var(--bg3); color:var(--text2); }
+
+  /* ─── SYSTEM HEALTH WIDGET ─── */
+  .health-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:12px; }
+  .health-lbl { width:44px; color:var(--text2); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+  .health-bar-wrap { flex:1; background:var(--bg3); border-radius:4px; height:12px; overflow:hidden; }
+  .health-bar { height:100%; border-radius:4px; transition:width .6s ease; background:var(--accent); }
+  .health-bar.warn { background:var(--yellow); }
+  .health-bar.crit { background:#ff4444; animation:pulse-dot 1s infinite; }
+  .health-val { width:46px; text-align:right; color:var(--text); font-weight:600; font-size:11px; }
+  .health-uptime { font-size:12px; color:var(--text2); margin-top:4px; }
+  .health-uptime span { color:var(--text); font-weight:600; }
+  .vendor-tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; background: rgba(0,204,255,0.1); color: var(--accent2); }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+  /* ─── TOAST ─── */
+  #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+  .toast { padding: 10px 16px; border-radius: 6px; font-size: 12px; background: var(--bg2); border: 1px solid var(--border); color: var(--text); min-width: 220px; animation: fadeIn 0.2s; }
+  .toast.ok  { border-color: var(--accent); color: var(--accent); }
+  .toast.err { border-color: var(--red); color: var(--red); }
+  .toast.warn { border-color: var(--orange); color: var(--orange); }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ─── RADIO PAGE specific ─── */
+  .iface-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
+  .iface-card .iface-name { font-size: 16px; color: var(--accent); font-weight: 700; margin-bottom: 4px; }
+  .iface-card .iface-role { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .iface-card .iface-info { font-size: 11px; color: var(--text2); line-height: 2; }
+  .iface-card .iface-info span { color: var(--text); }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 900px) {
+    #sidebar { width: 52px; }
+    #sidebar nav a span.label { display: none; }
+    #sidebar .logo { font-size: 0; padding: 16px 14px; }
+    #sidebar .logo::before { content: "PP"; color: var(--accent); font-size: 14px; font-weight: 700; }
+    #sidebar .status-bar { display: none; }
+    #main { margin-left: 52px; }
+    .g4 { grid-template-columns: repeat(2,1fr); }
+    .g3 { grid-template-columns: repeat(2,1fr); }
+  }
+  @media (max-width: 600px) {
+    .g2, .g3, .g4 { grid-template-columns: 1fr; }
+    .page { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ SIDEBAR ═══════════════════════════════════════ -->
+<div id="sidebar">
+  <div class="logo">PINEAPPLE PI<span>Security Research Platform</span></div>
+  <nav>
+    <a href="#" class="active" onclick="nav('dashboard',this)">
+      <span class="icon">&#9632;</span><span class="label">Dashboard</span>
+    </a>
+    <a href="#" onclick="nav('radio',this)">
+      <span class="icon">&#9685;</span><span class="label">Radio</span>
+    </a>
+    <a href="#" onclick="nav('clients',this)">
+      <span class="icon">&#9632;</span><span class="label">Clients</span>
+    </a>
+    <a href="#" onclick="nav('recon',this)">
+      <span class="icon">&#9640;</span><span class="label">Recon</span>
+    </a>
+    <a href="#" onclick="nav('vulns',this)">
+      <span class="icon">&#9650;</span><span class="label">Vulns</span>
+    </a>
+    <a href="#" onclick="nav('creds',this)">
+      <span class="icon">&#9670;</span><span class="label">Credentials</span>
+    </a>
+    <a href="#" onclick="nav('logs',this)">
+      <span class="icon">&#9644;</span><span class="label">Logs</span>
+    </a>
+  </nav>
+  <div class="status-bar">
+    <div><span class="dot" id="dot-monitor"></span><span id="lbl-monitor">MONITOR OFF</span></div>
+    <div style="margin-top:6px"><span class="dot" id="dot-ap"></span><span id="lbl-ap">AP OFF</span></div>
+    <div style="margin-top:6px" id="attack-status-bar" style="display:none">
+      <span class="dot attack" id="dot-attack"></span><span id="lbl-attack" style="color:var(--orange)">ATTACK ON</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════ MAIN ═══════════════════════════════════════ -->
+<div id="main">
+  <div class="topbar">
+    <h1 id="page-title">Dashboard</h1>
+    <div class="right">
+      <span>wlan1: <span id="tb-iface-state" style="color:var(--text2)">unknown</span></span>
+      <span id="tb-attack-vendor" style="display:none;color:var(--orange)"></span>
+      <span class="clock" id="clock"></span>
+    </div>
+  </div>
+
+  <!-- ═══ DASHBOARD PAGE ═══ -->
+  <div class="page active" id="page-dashboard">
+
+    <!-- Row 1: stat cards -->
+    <div class="grid g4">
+      <div class="card stat"><div class="val" id="stat-aps">0</div><div class="lbl">APs Detected</div></div>
+      <div class="card stat"><div class="val" id="stat-clients">0</div><div class="lbl">Clients</div></div>
+      <div class="card stat"><div class="val red" id="stat-vulns">0</div><div class="lbl">Vulnerabilities</div></div>
+      <div class="card stat"><div class="val orange" id="stat-creds">0</div><div class="lbl">Credentials</div></div>
+    </div>
+
+    <!-- Row 2: System Health | Attack Status -->
+    <div class="grid g2 mt16">
+
+      <!-- SYSTEM HEALTH -->
+      <div class="card">
+        <div class="card-header">System Health
+          <span id="passive-badge" class="badge" style="display:none">● SCANNING</span>
+        </div>
+        <div style="padding:4px 0">
+          <div class="health-row">
+            <div class="health-lbl">CPU</div>
+            <div class="health-bar-wrap"><div class="health-bar" id="bar-cpu" style="width:0%"></div></div>
+            <div class="health-val" id="val-cpu">—</div>
+          </div>
+          <div class="health-row">
+            <div class="health-lbl">RAM</div>
+            <div class="health-bar-wrap"><div class="health-bar" id="bar-ram" style="width:0%"></div></div>
+            <div class="health-val" id="val-ram">—</div>
+          </div>
+          <div class="health-row">
+            <div class="health-lbl">TEMP</div>
+            <div class="health-bar-wrap"><div class="health-bar" id="bar-temp" style="width:0%"></div></div>
+            <div class="health-val" id="val-temp">—</div>
+          </div>
+          <hr class="sep" style="margin:10px 0">
+          <div style="font-size:11px;line-height:2;color:var(--text2)">
+            wlan1: <span id="dash-iface-state" style="color:var(--text)">unknown</span><br>
+            Attack: <span id="dash-attack-target" style="color:var(--text)">None</span><br>
+            Uptime: <span id="val-uptime">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ATTACK STATUS -->
+      <div class="card">
+        <div class="card-header">Attack Status
+          <span class="badge orange" id="dash-attack-badge" style="display:none">ACTIVE</span>
+        </div>
+        <div id="dash-no-attack" style="color:var(--text2);font-size:12px;padding:20px 0;text-align:center">
+          No active attack.<br>
+          <span style="font-size:11px">Select an AP and click ⚡ ATTACK</span>
+        </div>
+        <div id="dash-attack-info" style="display:none">
+          <div style="font-size:12px;margin-bottom:12px;line-height:2;color:var(--text2)">
+            Target: <span id="dash-atk-ssid" style="color:var(--orange);font-weight:700">—</span><br>
+            BSSID: <span id="dash-atk-bssid" class="mono" style="color:var(--text)">—</span>
+            &nbsp; CH: <span id="dash-atk-ch" style="color:var(--text)">—</span>
+            &nbsp; Portal: <span id="dash-atk-vendor" style="color:var(--accent2)">—</span>
+          </div>
+          <!-- Mini 4-stage progress -->
+          <div id="dash-stages" style="display:flex;flex-direction:column;gap:4px">
+            <div class="atk-stage pending" id="dash-stage-1">
+              <div class="atk-stage-num">1</div>
+              <div class="atk-stage-body">
+                <div class="atk-stage-title">Evil Twin + Deauth <span class="atk-status-pill pill-pending" id="dash-s1-pill">PENDING</span></div>
+                <div class="atk-stage-detail" id="dash-s1-detail">Deauth sent: <b id="dash-deauth-count">0</b></div>
+              </div>
+            </div>
+            <div class="atk-stage pending" id="dash-stage-2">
+              <div class="atk-stage-num">2</div>
+              <div class="atk-stage-body">
+                <div class="atk-stage-title">Victim <span class="atk-status-pill pill-pending" id="dash-s2-pill">WAITING</span></div>
+                <div class="atk-stage-detail" id="dash-s2-detail">Monitoring DHCP on at0…</div>
+              </div>
+            </div>
+            <div class="atk-stage pending" id="dash-stage-3">
+              <div class="atk-stage-num">3</div>
+              <div class="atk-stage-body">
+                <div class="atk-stage-title">Auto-Recon <span class="atk-status-pill pill-pending" id="dash-s3-pill">PENDING</span></div>
+                <div class="atk-stage-detail" id="dash-s3-detail">nmap + CVE lookup</div>
+              </div>
+            </div>
+            <div class="atk-stage pending" id="dash-stage-4">
+              <div class="atk-stage-num">4</div>
+              <div class="atk-stage-body">
+                <div class="atk-stage-title">Captive Portal <span class="atk-status-pill pill-pending" id="dash-s4-pill">PENDING</span></div>
+                <div class="atk-stage-detail" id="dash-s4-detail">Waiting for password…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn danger" style="font-size:11px;padding:4px 12px;display:none" id="dash-btn-stop" onclick="stopAttack()">■ STOP ATTACK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Network Activity Chart -->
+    <div class="card mt16">
+      <div class="card-header">
+        Network Activity — Live
+        <span class="badge" id="badge-activity" style="display:none">● LIVE</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="activity-chart"></canvas>
+        <div class="chart-overlay" id="chart-overlay">Passive scan starting… waiting for data</div>
+      </div>
+    </div>
+
+    <!-- Row 4: Top APs with action buttons -->
+    <div class="card mt16">
+      <div class="card-header">Discovered APs <span class="badge" id="badge-aps">0</span></div>
+      <table class="tbl">
+        <thead><tr><th>SSID</th><th>BSSID</th><th>CH</th><th>Signal</th><th>ENC</th><th>Frames</th><th>Actions</th></tr></thead>
+        <tbody id="dash-aps"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ═══ RADIO PAGE ═══ -->
+  <div class="page" id="page-radio">
+    <div class="grid g2">
+      <div class="card">
+        <div class="card-header">Attack Interface — wlan1 (RTL8812AU)</div>
+        <div class="iface-card">
+          <div class="iface-name">wlan1</div>
+          <div class="iface-role">Attack / Monitor / Injection</div>
+          <div class="iface-info">
+            Driver: <span>rtl88XXau</span><br>
+            Mode: <span id="r-mode">managed</span><br>
+            MAC: <span id="r-mac">—</span><br>
+            Monitor iface: <span id="r-mon">—</span>
+          </div>
+        </div>
+        <hr class="sep">
+        <div class="section-title">Monitor Mode</div>
+        <div class="btn-row">
+          <button class="btn primary" id="btn-mon-start" onclick="monStart()">START MONITOR</button>
+          <button class="btn danger" id="btn-mon-stop" onclick="monStop()" disabled>STOP MONITOR</button>
+        </div>
+        <div class="terminal mt16" id="radio-log" style="height:180px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">Evil Twin AP</div>
+        <div class="grid g2" style="gap:10px; margin-bottom:12px">
+          <div>
+            <div class="section-title">SSID</div>
+            <input class="inp" id="et-ssid" value="FreeWiFi" style="width:100%">
+          </div>
+          <div>
+            <div class="section-title">Channel</div>
+            <select class="inp" id="et-ch" style="width:100%">
+              <option>1</option><option selected>6</option><option>11</option>
+              <option>36</option><option>40</option><option>44</option><option>48</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn primary" id="btn-ap-start" onclick="apStart()">START AP</button>
+          <button class="btn danger" id="btn-ap-stop" onclick="apStop()" disabled>STOP AP</button>
+        </div>
+        <hr class="sep">
+        <div class="card-header">Deauth Attack</div>
+        <div class="input-row" style="margin-bottom:10px">
+          <input class="inp" id="deauth-bssid" placeholder="Target BSSID (AA:BB:CC:DD:EE:FF)" style="flex:1">
+          <input class="inp" id="deauth-client" placeholder="Client MAC (or FF:FF:FF:FF:FF:FF)" style="width:160px">
+          <input class="inp" id="deauth-channel" type="number" min="1" max="14" value="1" placeholder="CH" style="width:55px" title="Channel">
+        </div>
+        <div class="btn-row">
+          <button class="btn danger" onclick="sendDeauth()">DEAUTH</button>
+          <button class="btn" onclick="injectTest()">INJECTION TEST</button>
+        </div>
+        <hr class="sep">
+        <div class="card-header">Airodump</div>
+        <div class="input-row">
+          <input class="inp" id="dump-time" value="30" style="width:80px"> <span style="color:var(--text2);font-size:11px">seconds</span>
+          <button class="btn primary" id="btn-dump" onclick="startDump()">SCAN APs</button>
+          <button class="btn danger" id="btn-dump-stop" onclick="stopDump()" disabled>STOP</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attack Panel -->
+    <div id="attack-panel" class="mt16" style="display:none">
+      <div class="card" style="border-color:var(--orange)">
+        <div class="card-header" style="color:var(--orange)">
+          ⚡ ATTACKING: <span id="atk-ssid">—</span>
+          <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+            <span style="font-size:11px;color:var(--text2)">Vendor: <span id="atk-vendor">—</span> &nbsp; CH: <span id="atk-ch">—</span></span>
+            <button class="btn danger" style="padding:3px 10px;font-size:10px" onclick="stopAttack()" id="btn-stop-attack">■ STOP</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <!-- Stages -->
+          <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:3px" id="attack-stages-list">
+            <div class="atk-stage pending" id="radio-stage-1">
+              <div class="atk-stage-num">1</div>
+              <div class="atk-stage-body">
+                <div class="atk-stage-title">Evil Twin + Deauth <span class="atk-status-pill pill-pending" id="r-s1-pill">PENDING</span></div>
+                <div class="atk-stage-detail">Deauth packets: <b id="atk-deauth-count">0</b></div>
+              </div>
+            </div>
+            <div class="atk-stage pending" id="radio-stage-2">
+              <div class="atk-stage-num">2</div>
+              <div class="atk-stage-body">
+                <div class="atk-stage-title">Victim <span class="atk-status-pill pill-pending" id="r-s2-pill">WAITING</span></div>
+                <div class="atk-stage-detail" id="r-s2-detail">Monitoring DHCP on at0 (10.0.0.x)…</div>
+              </div>
+            </div>
+            <div class="atk-stage pending" id="radio-stage-3">
+              <div class="atk-stage-num">3</div>
+              <div class="atk-stage-body">
+                <div class="atk-stage-title">Auto-Recon <span class="atk-status-pill pill-pending" id="r-s3-pill">PENDING</span></div>
+                <div class="atk-stage-detail" id="r-s3-detail">nmap -sV -O + CVE lookup</div>
+              </div>
+            </div>
+            <div class="atk-stage pending" id="radio-stage-4">
+              <div class="atk-stage-num">4</div>
+              <div class="atk-stage-body">
+                <div class="atk-stage-title">Captive Portal <span class="atk-status-pill pill-pending" id="r-s4-pill">PENDING</span></div>
+                <div class="atk-stage-detail" id="r-s4-detail">Waiting for victim to enter password</div>
+              </div>
+            </div>
+          </div>
+          <!-- Attack log -->
+          <div style="flex:1;min-width:220px">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:4px">ATTACK LOG</div>
+            <div class="terminal" id="attack-log" style="height:140px;font-size:10px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt16">
+      <div class="card-header">Discovered APs (live) <span class="badge" id="badge-aps-radio">0</span></div>
+      <table class="tbl">
+        <thead><tr><th>SSID</th><th>BSSID</th><th>CH</th><th>Signal</th><th>ENC</th><th>Frames</th><th>Actions</th></tr></thead>
+        <tbody id="radio-aps"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ CLIENTS PAGE ═══ -->
+  <div class="page" id="page-clients">
+    <div class="card">
+      <div class="card-header">Connected Clients <span class="badge" id="badge-clients-page">0</span>
+        <button class="btn" onclick="loadClients()">Refresh</button>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>MAC</th><th>IP</th><th>Vendor</th><th>Hostname</th><th>OS</th><th>Open Ports</th><th>First Seen</th><th>Recon</th></tr></thead>
+        <tbody id="clients-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ RECON PAGE ═══ -->
+  <div class="page" id="page-recon">
+    <div class="grid g2">
+      <div class="card">
+        <div class="card-header">Manual Recon</div>
+        <div class="input-row" style="margin-bottom:12px">
+          <input class="inp" id="recon-ip" placeholder="IP or CIDR (e.g. 10.0.0.5)" style="flex:1">
+          <button class="btn primary" onclick="runRecon()">RUN SCAN</button>
+        </div>
+        <div class="section-title">nmap flags</div>
+        <div class="btn-row" style="margin-bottom:12px">
+          <label class="btn" style="cursor:pointer"><input type="checkbox" id="f-sV" checked style="margin-right:4px">-sV</label>
+          <label class="btn" style="cursor:pointer"><input type="checkbox" id="f-O" checked style="margin-right:4px">-O</label>
+          <label class="btn" style="cursor:pointer"><input type="checkbox" id="f-A" style="margin-right:4px">-A</label>
+          <label class="btn" style="cursor:pointer"><input type="checkbox" id="f-vuln" style="margin-right:4px">--script vuln</label>
+        </div>
+        <div class="terminal" id="recon-log"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">Recon Results</div>
+        <table class="tbl">
+          <thead><tr><th>IP</th><th>OS</th><th>Ports</th><th>CVEs</th><th>Time</th></tr></thead>
+          <tbody id="recon-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ VULNS PAGE ═══ -->
+  <div class="page" id="page-vulns">
+    <div class="grid g4" style="margin-bottom:16px">
+      <div class="card stat"><div class="val red" id="v-critical">0</div><div class="lbl">Critical</div></div>
+      <div class="card stat"><div class="val red" id="v-high">0</div><div class="lbl">High</div></div>
+      <div class="card stat"><div class="val yellow" id="v-medium">0</div><div class="lbl">Medium</div></div>
+      <div class="card stat"><div class="val" id="v-low">0</div><div class="lbl">Low</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">CVE Database <span class="badge" id="badge-vulns">0</span>
+        <button class="btn" onclick="loadVulns()">Refresh</button>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>CVE ID</th><th>Target IP</th><th>Service</th><th>CVSS</th><th>Severity</th><th>Description</th></tr></thead>
+        <tbody id="vulns-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ CREDENTIALS PAGE ═══ -->
+  <div class="page" id="page-creds">
+    <div class="grid g3" style="margin-bottom:16px">
+      <div class="card stat"><div class="val orange" id="stat-creds-page">0</div><div class="lbl">Total Captured</div></div>
+      <div class="card stat"><div class="val" id="stat-creds-unique">0</div><div class="lbl">Unique IPs</div></div>
+      <div class="card stat"><div class="val yellow" id="stat-creds-passwords">0</div><div class="lbl">Passwords</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        Captured Credentials
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="badge orange" id="badge-creds-page">0</span>
+          <button class="btn" onclick="loadCreds()">Refresh</button>
+          <button class="btn danger" style="padding:3px 10px;font-size:10px" onclick="clearCreds()">Clear DB</button>
+        </div>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Time</th><th>IP</th><th>SSID</th><th>Field</th><th>Value</th><th>Portal</th><th>✓</th></tr></thead>
+        <tbody id="creds-tbody"></tbody>
+      </table>
+    </div>
+    <div class="card mt16">
+      <div class="card-header">Live Feed <span class="badge orange" id="badge-creds-live">0</span></div>
+      <div class="terminal" id="creds-live-log" style="height:200px"></div>
+    </div>
+  </div>
+
+  <!-- ═══ LOGS PAGE ═══ -->
+  <div class="page" id="page-logs">
+    <div class="grid g2">
+      <div class="card">
+        <div class="card-header">System Events
+          <div class="btn-row">
+            <button class="btn" onclick="clearLog('events-log')">Clear</button>
+            <button class="btn" onclick="loadEvents()">Reload</button>
+          </div>
+        </div>
+        <div class="terminal" id="events-log" style="height:420px"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">Portal Credentials (log)
+          <span class="badge orange" id="badge-creds-log">0</span>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Time</th><th>IP</th><th>Field</th><th>Value</th></tr></thead>
+          <tbody id="creds-log-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#main -->
+
+<div id="toast-container"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CORE
+// ═══════════════════════════════════════════════════════
+const socket = io();
+let state = {
+  monitor: false, ap: false, dumping: false, scanning: false,
+  attackActive: false, aps: [], clients: [], vulns: [],
+  credCount: 0, liveCreds: 0
+};
+
+function nav(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('#sidebar nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  if (el) el.classList.add('active');
+  else document.querySelectorAll('#sidebar nav a').forEach(a => {
+    if (a.getAttribute('onclick') && a.getAttribute('onclick').includes("'" + page + "'")) a.classList.add('active');
+  });
+  const titles = {dashboard:'Dashboard', radio:'Radio Control', clients:'Clients',
+    recon:'Recon', vulns:'Vulnerabilities', creds:'Credentials', logs:'Logs'};
+  document.getElementById('page-title').textContent = titles[page] || page;
+  if (page === 'clients') loadClients();
+  if (page === 'vulns')   loadVulns();
+  if (page === 'logs')    loadEvents();
+  if (page === 'creds')   loadCreds();
+}
+
+setInterval(() => {
+  const n = new Date();
+  document.getElementById('clock').textContent = n.toISOString().replace('T',' ').slice(0,19) + ' UTC';
+}, 1000);
+
+function toast(msg, type='ok') {
+  const c = document.getElementById('toast-container');
+  const d = document.createElement('div');
+  d.className = 'toast ' + type;
+  d.textContent = msg;
+  c.appendChild(d);
+  setTimeout(() => d.remove(), 4000);
+}
+
+async function api(method, path, body) {
+  try {
+    const opts = { method, headers: {'Content-Type':'application/json'} };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch('/api' + path, opts);
+    return await r.json();
+  } catch(e) { toast(e.message, 'err'); throw e; }
+}
+
+function logLine(elId, line, cls='') {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const ts = new Date().toTimeString().slice(0,8);
+  const d = document.createElement('div');
+  d.innerHTML = `<span class="ts">[${ts}]</span> <span class="${cls}">${escHtml(line)}</span>`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+  while (el.children.length > 500) el.removeChild(el.firstChild);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function clearLog(id) { const e = document.getElementById(id); if(e) e.innerHTML = ''; }
+
+function sigBar(dbm) {
+  const v = parseInt(dbm) || -100;
+  let s = 1;
+  if (v > -60) s=4; else if (v > -70) s=3; else if (v > -80) s=2;
+  return `<div class="sig-bar s${s}"><div></div><div></div><div></div><div></div></div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// SOCKET.IO EVENTS
+// ═══════════════════════════════════════════════════════
+socket.on('connect', () => {
+  logLine('events-log', 'Socket connected', 'ok');
+  // Auto-start passive scan on page load
+  setTimeout(() => api('POST', '/scan/passive/start').catch(() => {}), 800);
+});
+socket.on('disconnect', () => logLine('events-log', 'Socket disconnected', 'err'));
+
+socket.on('ap-update', (data) => {
+  state.aps = data;
+  renderAPs();
+  document.getElementById('stat-aps').textContent = data.length;
+});
+
+socket.on('client-update', (data) => {
+  state.clients = data;
+  renderDashClients();
+  document.getElementById('stat-clients').textContent = data.length;
+  document.getElementById('badge-clients').textContent = data.length;
+  document.getElementById('badge-clients-page').textContent = data.length;
+});
+
+socket.on('radio-log', (line) => {
+  logLine('radio-log', line);
+  logLine('events-log', '[RADIO] ' + line);
+});
+
+socket.on('recon-log', (line) => {
+  logLine('recon-log', line);
+  logLine('events-log', '[RECON] ' + line);
+});
+
+socket.on('scan-progress', (data) => {
+  document.getElementById('scan-msg').textContent = data.msg || 'Scanning...';
+  if (data.pct != null) document.getElementById('scan-pbar').style.width = data.pct + '%';
+  logLine('events-log', '[SCAN] ' + (data.msg || ''), 'info');
+});
+
+socket.on('scan-done', (data) => {
+  setScanState(false);
+  toast('Full scan complete: ' + (data.clients||0) + ' clients, ' + (data.vulns||0) + ' CVEs');
+  loadDashboard(); loadVulns();
+});
+
+socket.on('new-client', (c) => {
+  logLine('events-log', `[+] New client: ${c.mac} ${c.ip} (${c.vendor||'?'})`, 'ok');
+  toast('New client: ' + c.mac);
+});
+
+socket.on('cred-captured', (c) => {
+  const vf = c.verified||'unconfirmed';
+  const vi = vf==='confirmed' ? '✓' : vf==='wrong' ? '✗' : '?';
+  const msg = `[CRED] ${c.ip} | ${c.ssid} | ${c.field}=${c.value} [${c.vendor}] ${vi}`;
+  logLine('events-log', msg, 'warn');
+  logLine('creds-live-log', msg, 'warn');
+  logLine('attack-log', msg, 'warn');
+  state.liveCreds++;
+  document.getElementById('badge-creds-live').textContent = state.liveCreds;
+  toast('Credential captured: ' + c.field + '=' + c.value, 'warn');
+  loadCreds();
+  updateCredStats();
+});
+
+socket.on('attack-stage', (d) => {
+  logLine('attack-log', d.msg, 'attack');
+  logLine('events-log', '[ATTACK] ' + d.msg, 'warn');
+  updateAttackStages(d.stage);
+  if (d.ssid) document.getElementById('atk-ssid').textContent = d.ssid;
+  if (d.bssid) document.getElementById('atk-bssid').textContent = d.bssid;
+  if (d.channel) document.getElementById('atk-ch').textContent = d.channel;
+  if (d.vendor) document.getElementById('atk-vendor').textContent = d.vendor + '.html';
+});
+
+socket.on('event', (e) => {
+  logLine('events-log', e.msg || JSON.stringify(e), e.level || '');
+});
+
+socket.on('state', (s) => {
+  // passive scan badge
+  const pb = document.getElementById('passive-badge');
+  if (pb) pb.style.display = s.passiveScanActive ? 'inline' : 'none';
+
+  // iface state
+  const mon = s.monitorActive, ap = s.apActive;
+  const ifaceEl = document.getElementById('dash-iface-state');
+  if (ifaceEl) ifaceEl.textContent = s.attackActive ? 'AP (attack)' : mon ? 'MONITOR' : ap ? 'AP' : 'managed';
+  const tbIface = document.getElementById('tb-iface-state');
+  if (tbIface) {
+    tbIface.textContent = s.attackActive ? 'ATTACK' : mon ? 'MONITOR' : ap ? 'AP' : 'managed';
+    tbIface.style.color = s.attackActive ? 'var(--orange)' : mon ? 'var(--yellow)' : ap ? 'var(--accent)' : 'var(--text2)';
+  }
+
+  // radio page buttons
+  const btnMonStart = document.getElementById('btn-mon-start');
+  const btnMonStop  = document.getElementById('btn-mon-stop');
+  const btnApStart  = document.getElementById('btn-ap-start');
+  const btnApStop   = document.getElementById('btn-ap-stop');
+  if (btnMonStart) btnMonStart.disabled = mon;
+  if (btnMonStop)  btnMonStop.disabled  = !mon;
+  if (btnApStart)  btnApStart.disabled  = ap;
+  if (btnApStop)   btnApStop.disabled   = !ap;
+  const rMode = document.getElementById('r-mode');
+  if (rMode) rMode.textContent = mon ? 'monitor' : ap ? 'AP/airbase-ng' : 'managed';
+
+  // sidebar dots
+  const dotMon = document.getElementById('dot-monitor');
+  const dotAp  = document.getElementById('dot-ap');
+  if (dotMon) dotMon.classList.toggle('on', mon);
+  if (dotAp)  dotAp.classList.toggle('on', ap);
+  const lblMon = document.getElementById('lbl-monitor');
+  const lblAp  = document.getElementById('lbl-ap');
+  if (lblMon) lblMon.textContent = mon ? 'MONITOR ON' : 'MONITOR OFF';
+  if (lblAp)  lblAp.textContent  = ap  ? 'AP ACTIVE'  : 'AP OFF';
+
+  // attack state
+  state.attackActive = !!s.attackActive;
+  const atkBar   = document.getElementById('attack-status-bar');
+  const atkVend  = document.getElementById('tb-attack-vendor');
+  const atkPanel = document.getElementById('attack-panel');
+  const noAtk    = document.getElementById('dash-no-attack');
+  const atkInfo  = document.getElementById('dash-attack-info');
+  const atkBadge = document.getElementById('dash-attack-badge');
+  const stopBtn  = document.getElementById('dash-btn-stop');
+
+  if (atkBar)  atkBar.style.display  = s.attackActive ? 'block' : 'none';
+  if (atkVend) {
+    atkVend.style.display = s.attackActive ? 'inline' : 'none';
+    atkVend.textContent   = s.attackActive ? `⚡${s.attackSSID||''}` : '';
+  }
+  if (atkPanel) atkPanel.style.display = s.attackActive ? 'block' : 'none';
+  if (noAtk)   noAtk.style.display    = s.attackActive ? 'none' : 'block';
+  if (atkInfo) atkInfo.style.display   = s.attackActive ? 'block' : 'none';
+  if (atkBadge) atkBadge.style.display = s.attackActive ? 'inline' : 'none';
+  if (stopBtn)  stopBtn.style.display  = s.attackActive ? 'inline-block' : 'none';
+
+  if (s.attackActive && s.attackSSID) {
+    setEl('atk-ssid', s.attackSSID);
+    setEl('atk-bssid', s.attackBSSID || '—');
+    setEl('atk-ch', s.attackChannel || '—');
+    setEl('atk-vendor', (s.attackVendor || 'generic') + '.html');
+    setEl('dash-atk-ssid', s.attackSSID);
+    setEl('dash-atk-bssid', s.attackBSSID || '—');
+    setEl('dash-atk-ch', s.attackChannel || '—');
+    setEl('dash-atk-vendor', (s.attackVendor || 'generic') + '.html');
+    setEl('dash-attack-target', s.attackSSID);
+  } else {
+    setEl('dash-attack-target', 'None');
+  }
+
+  if (s.attackDeauthCount != null) {
+    setEl('atk-deauth-count', s.attackDeauthCount.toLocaleString());
+    setEl('dash-deauth-count', s.attackDeauthCount.toLocaleString());
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// ATTACK STAGE UPDATES
+// ═══════════════════════════════════════════════════════
+function setEl(id, val) { const e = document.getElementById(id); if (e) e.textContent = val; }
+
+function applyStage(prefix, stageNum, status, msg) {
+  for (let i = 1; i <= 4; i++) {
+    const el   = document.getElementById(`${prefix}-stage-${i}`);
+    const pill = document.getElementById(`${prefix === 'dash' ? 'dash' : 'r'}-s${i}-pill`);
+    if (!el) continue;
+    if (i < stageNum) {
+      el.className = 'atk-stage done';
+      if (pill) { pill.className = 'atk-status-pill pill-done'; pill.textContent = '✓ DONE'; }
+    } else if (i === stageNum) {
+      const isDone = status === 'DONE' || status === 'CONNECTED';
+      el.className = 'atk-stage ' + (isDone ? 'done' : 'active');
+      if (pill) {
+        pill.className = 'atk-status-pill ' + (isDone ? 'pill-done' : status === 'WAITING' ? 'pill-waiting' : 'pill-active');
+        pill.textContent = isDone ? '✓ DONE' : `● ${status}`;
+      }
+      const detail = document.getElementById(`${prefix === 'dash' ? 'dash' : 'r'}-s${i}-detail`);
+      if (detail && msg) detail.textContent = msg;
+    } else {
+      el.className = 'atk-stage pending';
+      if (pill) { pill.className = 'atk-status-pill pill-pending'; pill.textContent = '○ PENDING'; }
+    }
+  }
+}
+
+socket.on('attack_stage_update', (d) => {
+  if (d.stage === 0) {
+    // reset all
+    for (let i = 1; i <= 4; i++) {
+      ['dash', 'radio'].forEach(prefix => {
+        const el = document.getElementById(`${prefix}-stage-${i}`);
+        if (el) el.className = 'atk-stage pending';
+        const pill = document.getElementById(`${prefix === 'dash' ? 'dash' : 'r'}-s${i}-pill`);
+        if (pill) { pill.className = 'atk-status-pill pill-pending'; pill.textContent = '○ PENDING'; }
+      });
+    }
+    return;
+  }
+  applyStage('dash', d.stage, d.status, d.msg);
+  applyStage('radio', d.stage, d.status, d.msg);
+
+  if (d.victimIP) {
+    const detail2d = document.getElementById('dash-s2-detail');
+    const detail2r = document.getElementById('r-s2-detail');
+    if (detail2d) detail2d.textContent = `Victim: ${d.victimIP} (${d.victimMAC||'?'})`;
+    if (detail2r) detail2r.textContent = `Victim: ${d.victimIP} (${d.victimMAC||'?'})`;
+  }
+  if (d.ssid) { setEl('atk-ssid', d.ssid); setEl('dash-atk-ssid', d.ssid); }
+  if (d.vendor) { setEl('atk-vendor', d.vendor + '.html'); setEl('dash-atk-vendor', d.vendor + '.html'); }
+  if (d.channel) { setEl('atk-ch', d.channel); setEl('dash-atk-ch', d.channel); }
+
+  logLine('attack-log', `[S${d.stage}] ${d.msg}`, 'attack');
+  logLine('events-log', `[ATTACK S${d.stage}] ${d.msg}`, 'warn');
+});
+
+socket.on('deauth_count', (d) => {
+  setEl('atk-deauth-count',  d.count.toLocaleString());
+  setEl('dash-deauth-count', d.count.toLocaleString());
+});
+
+// ═══════════════════════════════════════════════════════
+// ATTACK ACTIONS
+// ═══════════════════════════════════════════════════════
+async function launchAttack(bssid, ssid, channel) {
+  if (state.attackActive) { toast('Attack already running — stop it first', 'warn'); return; }
+  clearLog('attack-log');
+  logLine('attack-log', `Launching: ${ssid} (${bssid}) CH${channel}`, 'attack');
+  // Show panel immediately
+  setEl('atk-ssid', ssid); setEl('atk-bssid', bssid); setEl('atk-ch', channel);
+  setEl('dash-atk-ssid', ssid); setEl('dash-atk-bssid', bssid); setEl('dash-atk-ch', channel);
+  const panel = document.getElementById('attack-panel');
+  if (panel) panel.style.display = 'block';
+  nav('radio', null);
+
+  const r = await api('POST', '/radio/attack', { bssid, ssid, channel: parseInt(channel) });
+  if (r.ok) {
+    state.attackActive = true;
+    toast(`⚡ Attack started on "${ssid}" — portal: ${r.vendor || 'generic'}`, 'warn');
+  } else {
+    toast(r.error || 'Attack failed', 'err');
+    if (panel) panel.style.display = 'none';
+  }
+}
+
+async function stopAttack() {
+  const r = await api('DELETE', '/radio/attack');
+  if (r.ok) {
+    state.attackActive = false;
+    const panel = document.getElementById('attack-panel');
+    if (panel) panel.style.display = 'none';
+    setEl('dash-attack-target', 'None');
+    toast('Attack stopped');
+    // Resume passive scan
+    setTimeout(() => api('POST', '/scan/passive/start').catch(() => {}), 2000);
+  } else {
+    toast(r.error || 'Stop failed', 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════
+async function loadDashboard() {
+  const [aps, clients, vulns, events] = await Promise.all([
+    api('GET','/aps').catch(()=>({aps:[]})),
+    api('GET','/clients').catch(()=>({clients:[]})),
+    api('GET','/vulns').catch(()=>({vulns:[]})),
+    api('GET','/events').catch(()=>({events:[]}))
+  ]);
+  state.aps = aps.aps || [];
+  state.clients = clients.clients || [];
+  state.vulns = vulns.vulns || [];
+  document.getElementById('stat-aps').textContent = state.aps.length;
+  document.getElementById('stat-clients').textContent = state.clients.length;
+  document.getElementById('stat-vulns').textContent = state.vulns.length;
+  document.getElementById('badge-aps').textContent = state.aps.length;
+  document.getElementById('badge-clients').textContent = state.clients.length;
+  renderAPs(); renderDashClients();
+  const ev = (events.events||[]).slice(-50).reverse();
+  clearLog('dash-events');
+  ev.forEach(e => logLine('dash-events', e.msg, e.level||''));
+  updateCredStats();
+}
+
+function apRow(a) {
+  const ssid = escHtml(a.ssid || '<hidden>');
+  const bssid = escHtml(a.bssid || '');
+  const frames = a.dataFrames != null ? a.dataFrames : '—';
+  return `<tr>
+    <td class="mono">${ssid}</td>
+    <td class="mono" style="color:var(--text2)">${bssid}</td>
+    <td>${a.channel||'?'}</td>
+    <td>${sigBar(a.signal)}<span style="font-size:10px;color:var(--text2)">${a.signal||''}dBm</span></td>
+    <td><span class="tag green">${escHtml(a.enc||'OPN')}</span></td>
+    <td style="color:var(--accent2);font-size:11px">${frames}</td>
+    <td style="white-space:nowrap">
+      <button class="btn attack-btn" style="padding:3px 7px;font-size:10px" onclick="launchAttack('${escHtml(a.bssid||'')}','${escHtml(a.ssid||'')}',${a.channel||6})">⚡ ATTACK</button>
+      <button class="btn" style="padding:3px 7px;font-size:10px" onclick="cloneAP('${escHtml(a.ssid||'')}','${a.channel||6}')">Clone</button>
+      <button class="btn danger" style="padding:3px 7px;font-size:10px" onclick="quickDeauth('${a.bssid}',${a.channel||1})">Deauth</button>
+    </td>
+  </tr>`;
+}
+
+function renderAPs() {
+  const empty = '<tr><td colspan="7" style="color:var(--text2);text-align:center;padding:16px">Passive scan starting…</td></tr>';
+  const rows  = state.aps.map(apRow).join('');
+  const dash  = document.getElementById('dash-aps');
+  const radio = document.getElementById('radio-aps');
+  if (dash)  dash.innerHTML  = rows || empty;
+  if (radio) radio.innerHTML = rows || empty;
+  document.getElementById('badge-aps').textContent = state.aps.length;
+  const br = document.getElementById('badge-aps-radio');
+  if (br) br.textContent = state.aps.length;
+}
+
+function renderDashClients() {
+  const tb = document.getElementById('dash-clients');
+  const rows = state.clients.slice(0,8).map(c => `<tr>
+    <td class="mono">${escHtml(c.mac||'')}</td>
+    <td class="mono">${escHtml(c.ip||'—')}</td>
+    <td style="color:var(--text2)">${escHtml(c.vendor||'Unknown')}</td>
+    <td style="font-size:10px;color:var(--text2)">${fmtTime(c.first_seen)}</td>
+  </tr>`).join('');
+  tb.innerHTML = rows || '<tr><td colspan="4" style="color:var(--text2);text-align:center">No clients</td></tr>';
+}
+
+function fmtTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(typeof ts === 'number' ? ts*1000 : ts);
+  return isNaN(d) ? ts : d.toTimeString().slice(0,8);
+}
+
+// ═══════════════════════════════════════════════════════
+// RADIO
+// ═══════════════════════════════════════════════════════
+async function monStart() {
+  document.getElementById('btn-mon-start').disabled = true;
+  logLine('radio-log', 'Starting monitor mode on wlan1...', 'info');
+  const r = await api('POST', '/radio/monitor/start');
+  if (r.ok) { state.monitor = true; updateRadioUI(); toast('Monitor mode started'); }
+  else { toast(r.error || 'Failed', 'err'); document.getElementById('btn-mon-start').disabled = false; }
+}
+
+async function monStop() {
+  document.getElementById('btn-mon-stop').disabled = true;
+  const r = await api('POST', '/radio/monitor/stop');
+  if (r.ok) { state.monitor = false; updateRadioUI(); toast('Monitor mode stopped'); }
+  else { toast(r.error || 'Failed', 'err'); document.getElementById('btn-mon-stop').disabled = false; }
+}
+
+async function apStart() {
+  const ssid = document.getElementById('et-ssid').value.trim() || 'FreeWiFi';
+  const ch = document.getElementById('et-ch').value;
+  document.getElementById('btn-ap-start').disabled = true;
+  const r = await api('POST', '/radio/eviltwin', {ssid, channel: parseInt(ch)});
+  if (r.ok) { state.ap = true; updateRadioUI(); toast('AP "' + ssid + '" started on CH' + ch); }
+  else { toast(r.error || 'Failed', 'err'); document.getElementById('btn-ap-start').disabled = false; }
+}
+
+async function apStop() {
+  document.getElementById('btn-ap-stop').disabled = true;
+  const r = await api('DELETE', '/radio/eviltwin');
+  if (r.ok) { state.ap = false; updateRadioUI(); toast('AP stopped'); }
+  else { toast(r.error || 'Failed', 'err'); document.getElementById('btn-ap-stop').disabled = false; }
+}
+
+function updateRadioUI() {
+  const mon = state.monitor;
+  const ap  = state.ap;
+  document.getElementById('btn-mon-start').disabled = mon;
+  document.getElementById('btn-mon-stop').disabled  = !mon;
+  document.getElementById('btn-ap-start').disabled  = ap;
+  document.getElementById('btn-ap-stop').disabled   = !ap;
+  document.getElementById('r-mode').textContent     = mon ? 'monitor' : (ap ? 'AP/airbase-ng' : 'managed');
+  document.getElementById('r-mon').textContent      = mon ? 'wlan1' : '—';
+  document.getElementById('tb-iface-state').textContent = mon ? 'MONITOR' : (ap ? 'AP' : 'managed');
+  document.getElementById('tb-iface-state').style.color = mon ? 'var(--yellow)' : (ap ? 'var(--accent)' : 'var(--text2)');
+  const dotMon = document.getElementById('dot-monitor');
+  const dotAp  = document.getElementById('dot-ap');
+  dotMon.classList.toggle('on', mon);
+  dotAp.classList.toggle('on', ap);
+  document.getElementById('lbl-monitor').textContent = mon ? 'MONITOR ON' : 'MONITOR OFF';
+  document.getElementById('lbl-ap').textContent = ap ? 'AP ACTIVE' : 'AP OFF';
+}
+
+async function sendDeauth() {
+  const bssid   = document.getElementById('deauth-bssid').value.trim();
+  const client  = document.getElementById('deauth-client').value.trim() || 'FF:FF:FF:FF:FF:FF';
+  const channel = parseInt(document.getElementById('deauth-channel').value) || 1;
+  if (!bssid) { toast('Enter target BSSID', 'err'); return; }
+  logLine('radio-log', `Deauth ${bssid} (${client}) ch${channel}...`, 'warn');
+  const r = await api('POST', '/radio/deauth', {bssid, client, channel});
+  if (r.ok) toast('Deauth started'); else toast(r.error || 'Failed', 'err');
+}
+
+async function injectTest() {
+  logLine('radio-log', 'Running injection test...', 'info');
+  const r = await api('POST', '/radio/inject_test');
+  if (r.ok) toast('Injection test OK');
+  else { logLine('radio-log', 'Injection test failed: ' + (r.error||''), 'err'); toast('Test failed', 'err'); }
+}
+
+let dumpTimer = null;
+async function startDump() {
+  const secs = parseInt(document.getElementById('dump-time').value) || 30;
+  document.getElementById('btn-dump').disabled = true;
+  document.getElementById('btn-dump-stop').disabled = false;
+  state.dumping = true;
+  logLine('radio-log', 'Starting airodump-ng for ' + secs + 's...', 'info');
+  const r = await api('POST', '/radio/scan', {duration: secs});
+  if (!r.ok) { toast(r.error || 'Failed', 'err'); stopDump(); }
+  else logLine('radio-log', 'Airodump started', 'ok');
+}
+
+function stopDump() {
+  document.getElementById('btn-dump').disabled = false;
+  document.getElementById('btn-dump-stop').disabled = true;
+  state.dumping = false;
+}
+
+function cloneAP(ssid, ch) {
+  document.getElementById('et-ssid').value = ssid;
+  document.getElementById('et-ch').value = ch;
+  nav('radio', null);
+  toast('AP config set: ' + ssid + ' CH' + ch);
+}
+
+function quickDeauth(bssid, channel) {
+  document.getElementById('deauth-bssid').value   = bssid;
+  document.getElementById('deauth-client').value  = 'FF:FF:FF:FF:FF:FF';
+  if (channel) document.getElementById('deauth-channel').value = channel;
+  nav('radio', null);
+  sendDeauth();
+}
+
+// ═══════════════════════════════════════════════════════
+// NETWORK ACTIVITY CHART (Chart.js)
+// ═══════════════════════════════════════════════════════
+const CHART_POINTS = 20;
+let activityChart = null;
+
+function initActivityChart() {
+  const canvas = document.getElementById('activity-chart');
+  if (!canvas || !window.Chart) return;
+  activityChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: '#718096', font: { size: 10 }, boxWidth: 12, padding: 8 }
+        },
+        tooltip: {
+          backgroundColor: '#111827',
+          borderColor: '#1e2a3a',
+          borderWidth: 1,
+          titleColor: '#a0aec0',
+          bodyColor: '#e2e8f0',
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} fr/s`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#4a5568', font: { size: 9 }, maxTicksLimit: 10 },
+          grid:  { color: '#1a2235' }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#718096', font: { size: 10 } },
+          grid:  { color: '#1a2235' },
+          title: { display: true, text: 'frames / sec', color: '#4a5568', font: { size: 10 } }
+        }
+      }
+    }
+  });
+}
+
+socket.on('activity_update', (data) => {
+  const overlay = document.getElementById('chart-overlay');
+  const badge   = document.getElementById('badge-activity');
+  const datasets = data.datasets || [];
+
+  if (!activityChart) initActivityChart();
+  if (!activityChart) return;
+
+  if (datasets.length > 0) {
+    if (overlay) overlay.style.display = 'none';
+    if (badge)   badge.style.display   = 'inline';
+  }
+
+  const label = new Date().toTimeString().slice(0, 8);
+  activityChart.data.labels.push(label);
+  if (activityChart.data.labels.length > CHART_POINTS) activityChart.data.labels.shift();
+
+  const activeBssids = datasets.map(d => d.bssid);
+  // Remove stale datasets
+  activityChart.data.datasets = activityChart.data.datasets.filter(d => activeBssids.includes(d.bssid));
+
+  for (const ds of datasets) {
+    const latestRate = ds.data.length ? ds.data[ds.data.length - 1].y : 0;
+    const existing   = activityChart.data.datasets.find(d => d.bssid === ds.bssid);
+    if (existing) {
+      existing.data.push(latestRate);
+      if (existing.data.length > CHART_POINTS) existing.data.shift();
+      existing.label = ds.ssid || ds.bssid; // keep label fresh
+    } else {
+      activityChart.data.datasets.push({
+        bssid:           ds.bssid,
+        label:           ds.ssid || ds.bssid,
+        data:            [latestRate],
+        borderColor:     ds.color,
+        backgroundColor: ds.color + '18',
+        borderWidth:     2,
+        pointRadius:     2,
+        pointHoverRadius:4,
+        tension:         0.35,
+        fill:            false,
+      });
+    }
+  }
+  activityChart.update('none');
+});
+
+// Init chart when DOM is ready
+document.addEventListener('DOMContentLoaded', initActivityChart);
+
+// ═══════════════════════════════════════════════════════
+// CLIENTS
+// ═══════════════════════════════════════════════════════
+async function loadClients() {
+  const r = await api('GET', '/clients');
+  const clients = r.clients || [];
+  state.clients = clients;
+  document.getElementById('badge-clients-page').textContent = clients.length;
+  const tb = document.getElementById('clients-tbody');
+  tb.innerHTML = clients.map(c => `<tr>
+    <td class="mono">${escHtml(c.mac||'')}</td>
+    <td class="mono">${escHtml(c.ip||'—')}</td>
+    <td>${escHtml(c.vendor||'Unknown')}</td>
+    <td>${escHtml(c.hostname||'—')}</td>
+    <td style="color:var(--text2);font-size:11px">${escHtml(c.os||'—')}</td>
+    <td style="font-size:11px">${escHtml((c.ports||'').toString())}</td>
+    <td style="font-size:10px;color:var(--text2)">${fmtTime(c.first_seen)}</td>
+    <td><button class="btn" style="padding:3px 8px;font-size:10px" onclick="reconIP('${escHtml(c.ip||'')}')">Recon</button></td>
+  </tr>`).join('') || '<tr><td colspan="8" style="color:var(--text2);text-align:center">No clients yet</td></tr>';
+}
+
+function reconIP(ip) {
+  document.getElementById('recon-ip').value = ip;
+  nav('recon', null); runRecon();
+}
+
+// ═══════════════════════════════════════════════════════
+// RECON
+// ═══════════════════════════════════════════════════════
+async function runRecon() {
+  const ip = document.getElementById('recon-ip').value.trim();
+  if (!ip) { toast('Enter IP', 'err'); return; }
+  logLine('recon-log', 'Starting nmap ' + ip, 'info');
+  const r = await api('POST', '/recon/scan/' + encodeURIComponent(ip), {});
+  if (r.ok || r.result) { logLine('recon-log', 'Scan complete for ' + ip, 'ok'); loadReconResults(); }
+  else { logLine('recon-log', 'Failed: ' + (r.error||'unknown'), 'err'); toast('Recon failed', 'err'); }
+}
+
+async function loadReconResults() {
+  const r = await api('GET', '/clients');
+  const tb = document.getElementById('recon-tbody');
+  const clients = (r.clients||[]).filter(c => c.ports || c.os);
+  tb.innerHTML = clients.map(c => `<tr>
+    <td class="mono">${escHtml(c.ip||'')}</td>
+    <td style="font-size:11px;color:var(--text2)">${escHtml(c.os||'—')}</td>
+    <td style="font-size:11px">${escHtml((c.ports||'').toString())}</td>
+    <td>—</td>
+    <td style="font-size:10px;color:var(--text2)">${fmtTime(c.last_scan)}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="color:var(--text2);text-align:center">No scan results</td></tr>';
+}
+
+// ═══════════════════════════════════════════════════════
+// VULNS
+// ═══════════════════════════════════════════════════════
+async function loadVulns() {
+  const r = await api('GET', '/vulns');
+  const vulns = r.vulns || [];
+  state.vulns = vulns;
+  document.getElementById('badge-vulns').textContent = vulns.length;
+  document.getElementById('stat-vulns').textContent  = vulns.length;
+  const counts = {CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0};
+  vulns.forEach(v => { if (counts[v.severity] !== undefined) counts[v.severity]++; });
+  ['CRITICAL','HIGH','MEDIUM','LOW'].forEach(s =>
+    document.getElementById('v-' + s.toLowerCase()).textContent = counts[s]);
+  const tb = document.getElementById('vulns-tbody');
+  tb.innerHTML = vulns.map(v => `<tr>
+    <td class="mono" style="color:var(--accent2)"><a href="https://nvd.nist.gov/vuln/detail/${escHtml(v.cve_id)}" target="_blank" style="color:inherit">${escHtml(v.cve_id||'')}</a></td>
+    <td class="mono">${escHtml(v.ip||'')}</td>
+    <td style="font-size:11px">${escHtml(v.service||'')}</td>
+    <td>${v.cvss ? '<span style="color:'+(v.cvss>=9?'#ff0044':v.cvss>=7?'var(--red)':v.cvss>=4?'var(--yellow)':'var(--accent)')+'">'+v.cvss+'</span>' : '—'}</td>
+    <td><span class="sev ${escHtml(v.severity||'NONE')}">${escHtml(v.severity||'NONE')}</span></td>
+    <td style="font-size:11px;color:var(--text2);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(v.description||'')}</td>
+  </tr>`).join('') || '<tr><td colspan="6" style="color:var(--text2);text-align:center">No CVEs found</td></tr>';
+}
+
+// ═══════════════════════════════════════════════════════
+// CREDENTIALS
+// ═══════════════════════════════════════════════════════
+async function loadCreds() {
+  try {
+    const r = await api('GET', '/portal/creds');
+    const creds = r.creds || [];
+    const passwords = creds.filter(c => c.field === 'password');
+    const uniqueIPs = [...new Set(creds.map(c => c.ip))].length;
+
+    document.getElementById('stat-creds').textContent = creds.length;
+    document.getElementById('badge-creds-log').textContent = creds.length;
+
+    const pageEl = document.getElementById('stat-creds-page');
+    const uniqEl = document.getElementById('stat-creds-unique');
+    const pwEl   = document.getElementById('stat-creds-passwords');
+    const badgeEl = document.getElementById('badge-creds-page');
+    if (pageEl)  pageEl.textContent  = creds.length;
+    if (uniqEl)  uniqEl.textContent  = uniqueIPs;
+    if (pwEl)    pwEl.textContent    = passwords.length;
+    if (badgeEl) badgeEl.textContent = creds.length;
+
+    const tb = document.getElementById('creds-tbody');
+    if (tb) {
+      tb.innerHTML = creds.map(c => {
+        const vf = c.verified||'unconfirmed';
+        const vi = vf==='confirmed'?'<span style="color:var(--accent);font-weight:700">✓</span>'
+                  :vf==='wrong'    ?'<span style="color:#ff4444;font-weight:700">✗</span>'
+                  :'<span style="color:var(--yellow)">?</span>';
+        return `<tr>
+          <td style="font-size:10px;color:var(--text2)">${fmtTime(c.ts)}</td>
+          <td class="mono">${escHtml(c.ip||'')}</td>
+          <td class="mono" style="color:var(--accent2)">${escHtml(c.ssid||'')}</td>
+          <td style="color:var(--text2)">${escHtml(c.field||'')}</td>
+          <td class="cred-value">${escHtml(c.value||'')}</td>
+          <td><span class="vendor-tag">${escHtml(c.vendor||'generic')}</span></td>
+          <td style="text-align:center">${vi}</td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="7" style="color:var(--text2);text-align:center">No credentials captured yet</td></tr>';
+    }
+
+    // Logs page table
+    const ltb = document.getElementById('creds-log-tbody');
+    if (ltb) {
+      ltb.innerHTML = creds.slice(0,20).map(c => `<tr>
+        <td style="font-size:10px;color:var(--text2)">${fmtTime(c.ts)}</td>
+        <td class="mono">${escHtml(c.ip||'')}</td>
+        <td style="color:var(--text2)">${escHtml(c.field||'')}</td>
+        <td class="cred-value">${escHtml(c.value||'')}</td>
+      </tr>`).join('') || '<tr><td colspan="4" style="color:var(--text2);text-align:center">No credentials captured</td></tr>';
+    }
+  } catch(e) {}
+}
+
+async function updateCredStats() {
+  try {
+    const r = await api('GET', '/portal/creds');
+    const n = (r.creds || []).length;
+    document.getElementById('stat-creds').textContent = n;
+    document.getElementById('badge-creds-log').textContent = n;
+    const p = document.getElementById('badge-creds-page');
+    if (p) p.textContent = n;
+  } catch {}
+}
+
+async function clearCreds() {
+  if (!confirm('Delete all captured credentials?')) return;
+  // Just reload — no clear endpoint needed unless you want to add one
+  toast('Use SSH to clear: sqlite3 /opt/pineapple/db/pineapple.db "DELETE FROM captured_creds;"', 'warn');
+}
+
+// ═══════════════════════════════════════════════════════
+// NETWORK ACTIVITY WIDGET
+// ═══════════════════════════════════════════════════════
+async function loadActivity() {
+  try {
+    const r = await api('GET', '/stats/activity');
+    const list = r.activity || [];
+    const el = document.getElementById('activity-list');
+    const empty = document.getElementById('activity-empty');
+    if (!el) return;
+
+    if (list.length === 0) {
+      el.innerHTML = '<div class="act-empty" id="activity-empty">Start scan to see network activity</div>';
+      return;
+    }
+
+    const maxRate = Math.max(...list.map(a => a.activity_rate), 1);
+    el.innerHTML = list.map(a => {
+      const rate = a.activity_rate || 0;
+      const pct  = Math.min(100, Math.round(rate / maxRate * 100));
+      const cls  = rate > 100 ? 'red' : rate > 50 ? 'orange' : rate > 10 ? 'yellow' : 'green';
+      const ssid = escHtml(a.ssid || a.bssid || '?');
+      const fps  = rate > 0 ? `${rate} fr/s` : `${a.data_max||0} fr`;
+      return `<div class="act-row">
+        <div class="act-ssid" title="${ssid}">${ssid}</div>
+        <div class="act-ch">${a.channel||'?'}</div>
+        <div class="act-bar-wrap"><div class="act-bar ${cls}" style="width:${pct}%"></div></div>
+        <div class="act-rate">${fps}</div>
+      </div>`;
+    }).join('');
+  } catch {}
+}
+
+setInterval(loadActivity, 10000);
+
+// ═══════════════════════════════════════════════════════
+// SYSTEM HEALTH WIDGET
+// ═══════════════════════════════════════════════════════
+function fmtUptime(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function applyHealthBar(barId, valId, pct, value, warnThresh, critThresh) {
+  const bar = document.getElementById(barId);
+  const val = document.getElementById(valId);
+  if (!bar || !val) return;
+  bar.style.width = Math.min(pct, 100) + '%';
+  bar.className = 'health-bar' +
+    (pct >= critThresh ? ' crit' : pct >= warnThresh ? ' warn' : '');
+  val.textContent = value;
+}
+
+socket.on('system_stats', (s) => {
+  applyHealthBar('bar-cpu',  'val-cpu',  s.cpuPercent,  s.cpuPercent + '%',  70, 90);
+  applyHealthBar('bar-ram',  'val-ram',  s.ramPercent,  s.ramPercent + '%',  70, 90);
+  // Temp: scale 0–100°C → 0–100%
+  const tempPct = Math.round(s.temp);
+  applyHealthBar('bar-temp', 'val-temp', tempPct, s.temp + '°C', 60, 75);
+  const ut = document.getElementById('val-uptime');
+  if (ut) ut.textContent = fmtUptime(s.uptime);
+});
+
+socket.on('alert', (a) => {
+  if (a.type === 'WARNING') toast(a.message, 'warn');
+});
+
+// ═══════════════════════════════════════════════════════
+// LOGS / EVENTS
+// ═══════════════════════════════════════════════════════
+async function loadEvents() {
+  const r = await api('GET', '/events');
+  const events = (r.events||[]).slice(-200).reverse();
+  clearLog('events-log');
+  events.forEach(e => logLine('events-log', e.msg, e.level||''));
+  loadCreds();
+}
+
+// ═══════════════════════════════════════════════════════
+// RADIO STATUS POLLING
+// ═══════════════════════════════════════════════════════
+async function pollRadioStatus() {
+  try {
+    const r = await api('GET', '/radio/status');
+    if (r.monitor !== undefined) {
+      state.monitor = r.monitor;
+      state.ap      = r.ap;
+      if (r.mac) document.getElementById('r-mac').textContent = r.mac;
+      updateRadioUI();
+    }
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+loadDashboard();
+pollRadioStatus();
+setInterval(pollRadioStatus, 10000);
+setInterval(loadDashboard, 30000);
+</script>
+</body>
+</html>

