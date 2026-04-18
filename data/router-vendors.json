@@ -10343,5 +10343,10 @@
     "vendor": "SHENZHEN BILIAN ELECTRONIC CO.，LTD",
     "model": "Router",
     "template": "generic"
+  },
+  "50:4F:3B": {
+    "vendor": "Beijing Xiaomi Mobile Software Co., Ltd",
+    "model": "Router",
+    "template": "xiaomi"
   }
 }
