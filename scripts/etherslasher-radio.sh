@@ -4,7 +4,9 @@
 #   AP mode via nl80211/hostapd HANGS this kernel — use airbase-ng instead
 #   airbase-ng runs in monitor mode, creates at0 tap interface for clients
 
-IFACE="wlan1"
+# Auto-detect attack interface
+IFACE=$(iw dev 2>/dev/null | awk '/Interface/ {print $2; exit}')
+IFACE=$(echo "$IFACE" | tr -d "[:space:]")
 DRIVER="88XXau"
 AP_IP="10.0.0.1"
 HOSTAPD_CONF="/opt/etherslasher/config/hostapd.conf"
@@ -34,7 +36,7 @@ reload_driver() {
     sleep 2
     # Wait for wlan1 to appear
     local n=0
-    while ! ip link show "${IFACE}" >/dev/null 2>&1; do
+while ! iw dev | grep -q ""; do
         sleep 0.5; n=$((n+1))
         [ ${n} -ge 12 ] && die "${IFACE} не появился после modprobe"
     done
@@ -130,7 +132,7 @@ start_ap() {
 
     # Wait for at0 (up to 8s)
     local n=0
-    while ! ip link show at0 >/dev/null 2>&1; do
+while ! iw dev | grep -q ""; do
         sleep 0.5; n=$((n+1))
         if [ ${n} -ge 16 ]; then
             kill -0 "${AIRBASE_PID}" 2>/dev/null || die "airbase-ng exited — check ${LOGFILE}"

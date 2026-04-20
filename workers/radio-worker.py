@@ -6,7 +6,8 @@ DB_PATH    = '/opt/etherslasher/db/etherslasher.db'
 MON_IFACE  = 'wlan1'
 CSV_PREFIX = '/tmp/etherslasher-worker'
 CYCLE_SECS = 30
-STALE_SECS = 300   # 5 min
+STALE_SECS = 300   # 5 min — APs not seen beyond this are removed
+STATION_STALE_SECS = 180  # 3 min — stations
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +56,19 @@ def init_db(conn):
         );
         CREATE INDEX IF NOT EXISTS idx_ap_lastseen ON access_points(last_seen);
         CREATE INDEX IF NOT EXISTS idx_ap_frames   ON access_points(data_frames DESC);
+
+        CREATE TABLE IF NOT EXISTS stations (
+            mac         TEXT PRIMARY KEY,
+            bssid       TEXT,
+            signal      INTEGER,
+            frames      INTEGER DEFAULT 0,
+            probes      TEXT    DEFAULT '',
+            last_seen   INTEGER,
+            first_seen  INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS idx_stations_bssid    ON stations(bssid);
+        CREATE INDEX IF NOT EXISTS idx_stations_lastseen ON stations(last_seen);
+
         CREATE TABLE IF NOT EXISTS ap_activity (
             id            INTEGER PRIMARY KEY,
             ts            TEXT,
@@ -66,9 +80,16 @@ def init_db(conn):
             clients_count INTEGER DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_ap_activity_bssid_ts ON ap_activity(bssid, ts);
-        CREATE INDEX IF NOT EXISTS idx_events_ts   ON events(ts);
-        CREATE INDEX IF NOT EXISTS idx_creds_ts    ON captured_creds(ts);
     ''')
+    # Safe-create indexes on tables owned by app.js (may or may not exist yet)
+    for ddl in [
+        "CREATE INDEX IF NOT EXISTS idx_events_ts  ON events(ts)",
+        "CREATE INDEX IF NOT EXISTS idx_creds_ts   ON captured_creds(ts)",
+    ]:
+        try:
+            conn.execute(ddl)
+        except Exception:
+            pass
     conn.commit()
 
 
@@ -78,19 +99,35 @@ def is_monitor():
             ['iw', 'dev', MON_IFACE, 'info'], stderr=subprocess.DEVNULL
         ).decode()
         return 'type monitor' in out
-    except:
+    except Exception:
+        pass
+    # Fallback for RTL8812AU — iw returns -ENOBUFS in monitor mode
+    try:
+        out = subprocess.check_output(
+            ['ip', 'link', 'show', MON_IFACE], stderr=subprocess.DEVNULL
+        ).decode()
+        return 'ieee802.11/radiotap' in out or 'PROMISC' in out
+    except Exception:
         return False
 
 
-BSSID_RE = re.compile(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')
+BSSID_RE  = re.compile(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')
+NOT_ASSOC = re.compile(r'not.associated', re.I)
 
 
 def parse_csv(path):
-    aps = []
+    """Return (aps, stations) parsed from an airodump-ng CSV file."""
+    aps      = []
+    stations = []
     try:
         with open(path, 'r', errors='replace') as f:
             content = f.read()
-        ap_section = content.split('Station MAC')[0]
+
+        parts      = content.split('Station MAC')
+        ap_section = parts[0]
+        st_section = parts[1] if len(parts) > 1 else ''
+
+        # ── Access Points ────────────────────────────────────────────────
         for row in csv.reader(io.StringIO(ap_section)):
             if len(row) < 14:
                 continue
@@ -108,14 +145,46 @@ def parse_csv(path):
                 })
             except (ValueError, IndexError):
                 continue
+
+        # ── Stations (client devices) ────────────────────────────────────
+        # CSV columns after the "Station MAC" header line:
+        # Station MAC | First time | Last time | Power | # packets | BSSID | Probed ESSIDs
+        if st_section:
+            lines = st_section.strip().split('\n')
+            for row in csv.reader(io.StringIO('\n'.join(lines[1:]))):
+                if len(row) < 6:
+                    continue
+                mac = row[0].strip()
+                if not mac or not BSSID_RE.match(mac):
+                    continue
+                ap_bssid = row[5].strip()
+                if NOT_ASSOC.search(ap_bssid) or ap_bssid in ('', 'FF:FF:FF:FF:FF:FF'):
+                    ap_bssid = None
+                elif not BSSID_RE.match(ap_bssid):
+                    ap_bssid = None
+                probes_raw = row[6].strip() if len(row) > 6 else ''
+                probes = ','.join(p.strip() for p in probes_raw.split(',') if p.strip())
+                try:
+                    stations.append({
+                        'mac':    mac,
+                        'bssid':  ap_bssid,
+                        'signal': int(row[3].strip() or 0),
+                        'frames': int(row[4].strip() or 0),
+                        'probes': probes,
+                    })
+                except (ValueError, IndexError):
+                    continue
+
     except Exception as e:
         log.warning('CSV parse error: %s', e)
-    return aps
+    return aps, stations
 
 
-def write_aps(conn, aps):
+def write_data(conn, aps, stations):
     now = int(time.time())
     ts  = time.strftime('%Y-%m-%dT%H:%M:%S')
+
+    # ── Access Points ────────────────────────────────────────────────────
     for ap in aps:
         conn.execute(
             '''INSERT INTO access_points
@@ -133,7 +202,25 @@ def write_aps(conn, aps):
             ' VALUES (?,?,?,?,?,?,0)',
             (ts, ap['bssid'], ap['ssid'], ap['channel'], ap['signal'], ap['data_frames']),
         )
+
+    # ── Stations ─────────────────────────────────────────────────────────
+    for st in stations:
+        conn.execute(
+            '''INSERT INTO stations (mac, bssid, signal, frames, probes, last_seen, first_seen)
+               VALUES (?,?,?,?,?,?,?)
+               ON CONFLICT(mac) DO UPDATE SET
+                   bssid=COALESCE(excluded.bssid, bssid),
+                   signal=excluded.signal,
+                   frames=MAX(excluded.frames, frames),
+                   probes=CASE WHEN excluded.probes != '' THEN excluded.probes ELSE probes END,
+                   last_seen=excluded.last_seen''',
+            (st['mac'], st['bssid'], st['signal'], st['frames'],
+             st['probes'], now, now),
+        )
+
+    # ── Stale cleanup ─────────────────────────────────────────────────────
     conn.execute('DELETE FROM access_points WHERE last_seen < ?', (now - STALE_SECS,))
+    conn.execute('DELETE FROM stations       WHERE last_seen < ?', (now - STATION_STALE_SECS,))
     conn.commit()
 
 
@@ -158,10 +245,10 @@ def run_cycle(conn):
             log.info('Monitor mode gone — stopping cycle')
             break
         if os.path.exists(csv_path):
-            aps = parse_csv(csv_path)
-            if aps:
-                write_aps(conn, aps)
-                log.debug('Wrote %d APs', len(aps))
+            aps, stations = parse_csv(csv_path)
+            if aps or stations:
+                write_data(conn, aps, stations)
+                log.debug('Wrote %d APs, %d stations', len(aps), len(stations))
 
     try: _proc.kill(); _proc.wait()
     except: pass
@@ -171,7 +258,10 @@ def run_cycle(conn):
 def cleanup_db(conn):
     try:
         conn.execute("DELETE FROM ap_activity WHERE ts < datetime('now', '-1 hour')")
-        conn.execute("DELETE FROM events WHERE ts < datetime('now', '-24 hours')")
+        try:
+            conn.execute("DELETE FROM events WHERE ts < datetime('now', '-24 hours')")
+        except Exception:
+            pass
         conn.commit()
         log.info('Hourly DB cleanup done')
     except Exception as e:

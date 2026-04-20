@@ -329,7 +329,7 @@
   <div class="topbar">
     <h1 id="page-title">Dashboard</h1>
     <div class="right">
-      <span>wlan1: <span id="tb-iface-state" style="color:var(--text2)">unknown</span></span>
+      <span><span id="tb-iface-name">wlan1</span>: <span id="tb-iface-state" style="color:var(--text2)">unknown</span></span>
       <span id="tb-attack-vendor" style="display:none;color:var(--orange)"></span>
       <span class="clock" id="clock"></span>
     </div>
@@ -460,9 +460,9 @@
   <div class="page" id="page-radio">
     <div class="grid g2">
       <div class="card">
-        <div class="card-header">Attack Interface — wlan1 (RTL8812AU)</div>
+        <div class="card-header">Attack Interface — <span id="r-iface-name">wlan1</span></div>
         <div class="iface-card">
-          <div class="iface-name">wlan1</div>
+          <div class="iface-name" id="r-iface-div">wlan1</div>
           <div class="iface-role">Attack / Monitor / Injection</div>
           <div class="iface-info">
             Driver: <span>rtl88XXau</span><br>
@@ -1538,6 +1538,11 @@ async function pollRadioStatus() {
       state.monitor = r.monitor;
       state.ap      = r.ap;
       if (r.mac) document.getElementById('r-mac').textContent = r.mac;
+      if (r.iface) {
+        const n = r.iface;
+        document.querySelectorAll('#tb-iface-name, #r-iface-name, #r-iface-div, #r-mon').forEach(el => { if(el) el.textContent = n; });
+        document.querySelectorAll('[data-wlan1]').forEach(el => el.textContent = n);
+      }
       updateRadioUI();
     }
   } catch(e) {}
