@@ -28,3 +28,18 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# SQLite WAL/SHM temp files
+db/*.db-shm
+db/*.db-wal
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Editor swap files
+*.swp
+*.bak
+
+# TUI (work in progress)
+tui/
