@@ -40,4 +40,4 @@ MIT (see LICENSE)
 ## Academic context
 
 Developed as part of coursework / thesis research at 
-**MIREA — Russian Technological University**, [институт/факультет].
+**MIREA — Russian Technological University**.
